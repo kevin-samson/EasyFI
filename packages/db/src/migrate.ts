@@ -6,7 +6,11 @@ import { fileURLToPath } from 'node:url';
 import type { DbHandle } from './client';
 
 /** Absolute path of the generated SQL migrations (packages/db/drizzle). */
-export const defaultMigrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
+// Joined at runtime on purpose: a literal `new URL('../drizzle', import.meta.url)` makes Turbopack try
+// to bundle the folder as an asset and fail the Next build.
+export const defaultMigrationsFolder = fileURLToPath(
+  new URL(['..', 'drizzle'].join('/'), import.meta.url),
+);
 
 /** Apply all pending migrations (schema + RLS) on either driver. Idempotent. */
 export async function runMigrations(

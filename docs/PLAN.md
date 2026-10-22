@@ -43,11 +43,16 @@ Stop when every box is ticked or only blocked tasks remain.
   - Note: no DATABASE_URL → embedded PGlite (`.easyfi-data/`) for local demo mode.
 - [x] PGlite test harness (fresh migrated DB per test file)
 - [x] Repositories with user scoping (test: user A cannot read user B's portfolio)
-- [ ] `contracts` zod schemas + OpenAPI generation at `/api/v1/openapi.json`
-- [ ] Auth middleware: Supabase JWT (Bearer) + SSR cookie; invite-code sign-up gate
-- [ ] Error envelope + zod validation helper
-- [ ] Endpoints: `/me`, portfolios CRUD, holdings CRUD, CSV import
-- [ ] Generated typed client package used by web
+- [x] `contracts` zod schemas + OpenAPI generation at `/api/v1/openapi.json`
+  - Note: M2 endpoints only (me, portfolios, holdings, import); later milestones add their schemas. Request bodies use `z.strictObject` so unknown fields 400. Stale `apps/web/.next/types` from an earlier build can fail typecheck locally — delete `.next`.
+- [x] Auth middleware: Supabase JWT (Bearer) + SSR cookie; invite-code sign-up gate
+  - Note: `services/auth.ts` (Bearer/chunked `sb-*-auth-token` cookie, HS256 secret or Supabase JWKS), `config.ts` (demo mode only outside production; prod without Supabase env throws), `POST /api/v1/auth/sign-up` creates users via the Supabase admin API (`SupabaseAuthAdmin`) so the invite check cannot be bypassed from the browser. `db/migrate.ts` joins the drizzle path at runtime — Turbopack failed on the literal URL.
+- [x] Error envelope + zod validation helper
+  - Note: `services/http.ts`: `route()` wrapper, `parseBody/parseParams/parseQuery`. Bad route ids return 404 (not 400) so ids cannot be probed; unexpected errors are logged and returned as a generic 500.
+- [x] Endpoints: `/me`, portfolios CRUD, holdings CRUD, CSV import
+  - Note: `services/me.ts`, `services/portfolios.ts` + `authedRoute()`; foreign ids are 404. CSV cash/money-market rows add to the portfolio cash balance; value-only lines store shares=0 + statementValue (shares is NOT NULL).
+- [x] Generated typed client package used by web
+  - Note: lives in `@easyfi/contracts/client` (openapi-typescript → `schema.gen.ts` + openapi-fetch `createApiClient`). Regenerate with `pnpm --filter @easyfi/contracts gen:client`; a file-snapshot test fails CI when it drifts. Web: `src/lib/api.ts`.
 
 ## M3 — Data ingestion
 - [x] `data-sources` interfaces + fakes: PriceSource, HoldingsSource, DividendSource, CpiSource, LLMProvider
@@ -96,4 +101,4 @@ Stop when every box is ticked or only blocked tasks remain.
 - [ ] Smoke test on production URL
 
 ## Blocked
-(none yet)
+- Rate limiting for `POST /auth/sign-up` (invite brute force; review finding 2026-10-22). Needs a decision: DB-backed counter table (free tier) vs Vercel/Upstash. Unblocks when the storage choice is made.

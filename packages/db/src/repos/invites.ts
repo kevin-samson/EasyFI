@@ -1,6 +1,9 @@
-import { and, eq, lt, sql } from 'drizzle-orm';
+import { and, lt, sql } from 'drizzle-orm';
 import type { Db } from '../client';
 import { invites, type Invite } from '../schema';
+
+/** Invite codes are matched case-insensitively (people retype them). */
+const sameCode = (code: string) => sql`upper(${invites.code}) = upper(${code.trim()})`;
 
 export function invitesRepo(db: Db) {
   return {
@@ -10,7 +13,7 @@ export function invitesRepo(db: Db) {
     },
 
     async get(code: string): Promise<Invite | null> {
-      const [row] = await db.select().from(invites).where(eq(invites.code, code));
+      const [row] = await db.select().from(invites).where(sameCode(code));
       return row ?? null;
     },
 
@@ -19,7 +22,7 @@ export function invitesRepo(db: Db) {
       const rows = await db
         .update(invites)
         .set({ used: sql`${invites.used} + 1` })
-        .where(and(eq(invites.code, code), lt(invites.used, invites.maxUses)))
+        .where(and(sameCode(code), lt(invites.used, invites.maxUses)))
         .returning({ code: invites.code });
       return rows.length > 0;
     },
