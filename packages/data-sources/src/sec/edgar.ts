@@ -119,6 +119,9 @@ export class SecEdgarClient implements HoldingsSource {
   async latestFiling(ticker: string): Promise<NportFiling | null> {
     const ids = await this.resolveFund(ticker);
     if (!ids) return null;
+    // Any failure of the series lookup (403/429 from browse-edgar) falls back to scanning.
+    const direct = await this.filingBySeries(ids).catch(() => null);
+    if (direct) return direct;
     const cik10 = String(ids.cik).padStart(10, '0');
     const subs = await this.getJson<Submissions>(
       `https://data.sec.gov/submissions/CIK${cik10}.json`,
@@ -170,7 +173,35 @@ export class SecEdgarClient implements HoldingsSource {
       fundTicker: ticker,
       ...(this.opts.cusipToTicker ? { cusipToTicker: this.opts.cusipToTicker } : {}),
     });
-    return { asOf: doc.asOf || filing.reportDate, constituents: doc.constituents };
+    // Never store an empty asOf: it would compare below every later filing and stick forever.
+    return {
+      asOf: doc.asOf || filing.reportDate || filing.filingDate,
+      constituents: doc.constituents,
+    };
+  }
+
+  /**
+   * EDGAR's company browse accepts a series id and lists only that series' filings. This finds
+   * funds in very large trusts (iShares, SPDR Series, Invesco) whose filing is far beyond the
+   * scan window of the trust's submissions list. Null → fall back to scanning.
+   */
+  private async filingBySeries(ids: FundIds): Promise<NportFiling | null> {
+    const atom = await this.getText(
+      `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${ids.seriesId}&type=NPORT-P&dateb=&owner=include&count=1&output=atom`,
+    );
+    const href = atom && /<filing-href>([^<]+)<\/filing-href>/.exec(atom)?.[1];
+    const acc = href && /\/(\d{10}-\d{2}-\d{6})-index\.html?$/.exec(href)?.[1];
+    if (!href || !acc) return null;
+    const cik = /\/edgar\/data\/(\d+)\//.exec(href)?.[1];
+    return {
+      cik: cik ? Number(cik) : ids.cik,
+      seriesId: ids.seriesId,
+      accessionNumber: acc,
+      // Report date comes from the document itself (genInfo/repPdDate) in latestHoldings.
+      reportDate: '',
+      filingDate: /<filing-date>([^<]+)<\/filing-date>/.exec(atom)?.[1] ?? '',
+      primaryDocUrl: href.replace(/\/[^/]+-index\.html?$/, '/primary_doc.xml'),
+    };
   }
 
   private async seriesOf(

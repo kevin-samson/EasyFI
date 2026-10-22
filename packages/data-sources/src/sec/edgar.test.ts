@@ -22,6 +22,8 @@ function router(routes: Record<string, () => Response>) {
 
 const TICKERS_URL = 'https://www.sec.gov/files/company_tickers_mf.json';
 const SUBS_URL = 'https://data.sec.gov/submissions/CIK0000036405.json';
+const seriesAtom = (series: string) =>
+  `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${series}&type=NPORT-P&dateb=&owner=include&count=1&output=atom`;
 const archive = (acc: string, file: string) =>
   `https://www.sec.gov/Archives/edgar/data/36405/${acc.replace(/-/g, '')}/${file}`;
 
@@ -102,7 +104,8 @@ describe('SecEdgarClient', () => {
     const vti = await c.latestFiling('VTI');
     expect(vti?.accessionNumber).toBe('0001752724-26-200003');
     const newUrls = fetch.calls.slice(before).map((x) => x.url);
-    expect(newUrls).toEqual([SUBS_URL]);
+    // Series lookup first (404 here), then the cached-ticker scan path re-reads submissions only.
+    expect(newUrls).toEqual([seriesAtom('S000002848'), SUBS_URL]);
   });
 
   it('returns null for tickers not in the SEC fund list (e.g. UITs)', async () => {
@@ -134,6 +137,20 @@ describe('SecEdgarClient', () => {
     });
     const c = new SecEdgarClient({ userAgent: UA, fetch, rateLimit: noWait, maxFilingsToScan: 2 });
     expect(await c.latestHoldings('SCHD')).toBeNull();
+  });
+
+  it('finds the filing directly by series id (big trusts like iShares) without scanning submissions', async () => {
+    const atom = `<?xml version="1.0"?><feed><entry><content><accession-number>0001752724-26-200002</accession-number><filing-date>2026-08-25</filing-date><filing-href>https://www.sec.gov/Archives/edgar/data/36405/000175272426200002/0001752724-26-200002-index.htm</filing-href></content></entry></feed>`;
+    const fetch = router({
+      [TICKERS_URL]: () => jsonResponse(tickers),
+      [seriesAtom('S000002277')]: () => textResponse(atom),
+      [archive('0001752724-26-200002', 'primary_doc.xml')]: () => textResponse(xml),
+    });
+    const c = new SecEdgarClient({ userAgent: UA, fetch, rateLimit: noWait });
+    const out = await c.latestHoldings('VOO');
+    expect(out?.asOf).toBe('2026-06-30');
+    expect(out?.constituents).toHaveLength(6);
+    expect(fetch.calls.some((x) => x.url === SUBS_URL)).toBe(false);
   });
 
   it('passes every request through the rate limiter', async () => {

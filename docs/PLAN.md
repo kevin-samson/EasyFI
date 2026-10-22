@@ -43,11 +43,16 @@ Stop when every box is ticked or only blocked tasks remain.
   - Note: no DATABASE_URL → embedded PGlite (`.easyfi-data/`) for local demo mode.
 - [x] PGlite test harness (fresh migrated DB per test file)
 - [x] Repositories with user scoping (test: user A cannot read user B's portfolio)
-- [ ] `contracts` zod schemas + OpenAPI generation at `/api/v1/openapi.json`
-- [ ] Auth middleware: Supabase JWT (Bearer) + SSR cookie; invite-code sign-up gate
-- [ ] Error envelope + zod validation helper
-- [ ] Endpoints: `/me`, portfolios CRUD, holdings CRUD, CSV import
-- [ ] Generated typed client package used by web
+- [x] `contracts` zod schemas + OpenAPI generation at `/api/v1/openapi.json`
+  - Note: M2 endpoints only (me, portfolios, holdings, import); later milestones add their schemas. Request bodies use `z.strictObject` so unknown fields 400. Stale `apps/web/.next/types` from an earlier build can fail typecheck locally — delete `.next`.
+- [x] Auth middleware: Supabase JWT (Bearer) + SSR cookie; invite-code sign-up gate
+  - Note: `services/auth.ts` (Bearer/chunked `sb-*-auth-token` cookie, HS256 secret or Supabase JWKS), `config.ts` (demo mode only outside production; prod without Supabase env throws), `POST /api/v1/auth/sign-up` creates users via the Supabase admin API (`SupabaseAuthAdmin`) so the invite check cannot be bypassed from the browser. `db/migrate.ts` joins the drizzle path at runtime — Turbopack failed on the literal URL.
+- [x] Error envelope + zod validation helper
+  - Note: `services/http.ts`: `route()` wrapper, `parseBody/parseParams/parseQuery`. Bad route ids return 404 (not 400) so ids cannot be probed; unexpected errors are logged and returned as a generic 500.
+- [x] Endpoints: `/me`, portfolios CRUD, holdings CRUD, CSV import
+  - Note: `services/me.ts`, `services/portfolios.ts` + `authedRoute()`; foreign ids are 404. CSV cash/money-market rows add to the portfolio cash balance; value-only lines store shares=0 + statementValue (shares is NOT NULL).
+- [x] Generated typed client package used by web
+  - Note: lives in `@easyfi/contracts/client` (openapi-typescript → `schema.gen.ts` + openapi-fetch `createApiClient`). Regenerate with `pnpm --filter @easyfi/contracts gen:client`; a file-snapshot test fails CI when it drifts. Web: `src/lib/api.ts`.
 
 ## M3 — Data ingestion
 - [x] `data-sources` interfaces + fakes: PriceSource, HoldingsSource, DividendSource, CpiSource, LLMProvider
@@ -55,8 +60,13 @@ Stop when every box is ticked or only blocked tasks remain.
 - [x] SEC EDGAR N-PORT client: ticker→series lookup, parse holdings XML, map CUSIP→ticker
   - Note: UIT funds (SPY, QQQ, DIA) don't file N-PORT → need seeded holdings.
 - [x] BLS CPI client
-- [ ] Securities search + seed of popular ETFs
-- [ ] Nightly job (spec §9) + `job_runs` table + GitHub Actions cron workflow
+- [x] Securities search + seed of popular ETFs
+  - Note: `services/catalog.ts` (50 popular US ETFs, names only — expense ratios left null until a verified source fills them; seeded on app start, never overwrites). `GET /securities/search` + `/securities/{ticker}`. `data-sources/sec/company-tickers.ts` parses SEC company_tickers.json (~10k stocks) for the nightly job.
+- [x] Nightly job (spec §9) + `job_runs` table + GitHub Actions cron workflow
+  - Note: `services/nightly.ts` (incremental prices/dividends from last stored date, N-PORT refresh only when newer, CPI only when a new month exists, prune >2y; per-ticker failures → `partial`), entry `packages/jobs/src/nightly.ts` via tsx, `.github/workflows/nightly.yml` (needs repo secrets DATABASE_URL, TIINGO_TOKEN, SEC_USER_AGENT, BLS_KEY; fails in CI without DATABASE_URL).
+  - Real run 2026-10-22 (SEC+BLS, no Tiingo token): 47/50 catalog ETFs with holdings (SPY/DIA are UITs; SPLG not in SEC fund list), 10,426 stocks, 181 CPI points, 1m13s.
+  - Review fixes: a step failing for every item fails the run; holdings skipped (last snapshot kept) when the SEC company list is down; held funds outside the catalog refresh too; same-CIK share classes map to the company, names shared by different CIKs stay unresolved; per-series CPI backfill; 29 Feb safe (core addMonths); CI requires DATABASE_URL, TIINGO_TOKEN, SEC_USER_AGENT; workflow `permissions: contents: read`.
+  - SEC client now looks a filing up by series id first (iShares/SPDR/Invesco trusts were beyond the 40-filing scan). Constituent tickers resolved by exact normalised issuer name vs SEC company list (`core/resolveConstituentTickers`), equity lines only: VOO 95.8%, SCHD 99.3%, VT 71.6% (non-US unresolved), AGG 0% (bonds). 25/25 random matches checked correct.
 
 ## M4 — Web app: shell, home, portfolio
 - [ ] App shell: sidebar, dark/light theme, responsive, auth pages (sign in/up with invite)
@@ -96,4 +106,4 @@ Stop when every box is ticked or only blocked tasks remain.
 - [ ] Smoke test on production URL
 
 ## Blocked
-(none yet)
+- Rate limiting for `POST /auth/sign-up` (invite brute force; review finding 2026-10-22). Needs a decision: DB-backed counter table (free tier) vs Vercel/Upstash. Unblocks when the storage choice is made.

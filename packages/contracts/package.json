@@ -5,18 +5,23 @@
   "description": "zod request/response schemas and OpenAPI generator",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client/index.ts"
   },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "gen:client": "vitest run src/client -u"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
+    "openapi-fetch": "^0.17.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@easyfi/test-fixtures": "workspace:*"
+    "@easyfi/test-fixtures": "workspace:*",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.9.10"
   }
 }
