@@ -130,6 +130,12 @@ export function settingsService(ctx: Ctx) {
       };
     },
 
+    async deleteInvite(userId: string, isAdmin: boolean, code: string): Promise<{ ok: true }> {
+      requireAdmin(userId, isAdmin);
+      if (!(await ctx.repos.invites.delete(code))) throw notFound('Invite');
+      return { ok: true };
+    },
+
     // ---- share links ----
     async listShareLinks(userId: string): Promise<{ links: ShareLink[] }> {
       const [links, ps] = await Promise.all([

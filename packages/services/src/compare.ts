@@ -104,7 +104,8 @@ export function compareService(ctx: Ctx) {
         shared: o.shared.slice(0, MAX_SHARED).map((s) => ({
           ticker: s.ticker,
           name: s.name,
-          sector: s.sector ? sectorLabel(s.sector) : null,
+          // full GICS name in the table (the donut legends use the short labels)
+          sector: s.sector,
           weightA: s.weightA,
           weightB: s.weightB,
         })),

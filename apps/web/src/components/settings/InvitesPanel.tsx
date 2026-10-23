@@ -49,6 +49,28 @@ export function InvitesPanel({ invites }: { invites: Invite[] }) {
                     text={() => `${window.location.origin}${signUpPath(i.code)}`}
                   />
                 ) : null}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Revoke ${i.code}`}
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      unwrap(
+                        await api.DELETE('/invites/{code}', { params: { path: { code: i.code } } }),
+                      );
+                      router.refresh();
+                    } catch (err) {
+                      setError(errorMessage(err, 'Could not revoke the invite.'));
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Revoke
+                </Button>
                 {left > 0 ? (
                   <span className="basis-full truncate text-[12px] text-faint">
                     {origin}

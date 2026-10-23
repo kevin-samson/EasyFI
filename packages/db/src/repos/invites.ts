@@ -13,6 +13,14 @@ export function invitesRepo(db: Db) {
       return db.select().from(invites).orderBy(desc(invites.createdAt));
     },
 
+    async delete(code: string): Promise<boolean> {
+      const rows = await db
+        .delete(invites)
+        .where(eq(invites.code, code))
+        .returning({ code: invites.code });
+      return rows.length > 0;
+    },
+
     async get(code: string): Promise<Invite | null> {
       const [row] = await db.select().from(invites).where(eq(invites.code, code));
       return row ?? null;

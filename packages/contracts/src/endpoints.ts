@@ -359,6 +359,15 @@ export const endpoints = {
     response: S.Invite,
     status: 201,
   }),
+  deleteInvite: def({
+    operationId: 'deleteInvite',
+    method: 'delete',
+    path: '/invites/:code',
+    summary: 'Revoke an invite code (admin)',
+    tag: 'settings',
+    params: z.object({ code: z.string().min(1) }),
+    response: S.Ok,
+  }),
   listShareLinks: def({
     operationId: 'listShareLinks',
     method: 'get',

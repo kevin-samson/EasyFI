@@ -87,6 +87,12 @@ const handlers: Record<Exclude<EndpointName, 'signUp' | 'signIn' | 'signOut'>, H
       (await s(c.rt).me.get(c.user.userId)).isAdmin,
       (c.body as { maxUses?: number }).maxUses,
     ),
+  deleteInvite: async (c) =>
+    s(c.rt).settings.deleteInvite(
+      c.user.userId,
+      (await s(c.rt).me.get(c.user.userId)).isAdmin,
+      c.params.code!,
+    ),
   listShareLinks: (c) => s(c.rt).settings.listShareLinks(c.user.userId),
   createShareLink: (c) =>
     s(c.rt).settings.createShareLink(

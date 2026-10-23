@@ -126,6 +126,14 @@ describe('settings', () => {
     });
     const list = await t.services.settings.listInvites(t.userId, true);
     expect(list.invites.length).toBeGreaterThan(0);
+    const inv = await t.services.settings.createInvite(t.userId, true, 2);
+    await expect(
+      t.services.settings.deleteInvite(OTHER_USER_ID, false, inv.code),
+    ).rejects.toMatchObject({ code: 'forbidden' });
+    expect(await t.services.settings.deleteInvite(t.userId, true, inv.code)).toEqual({ ok: true });
+    await expect(t.services.settings.deleteInvite(t.userId, true, inv.code)).rejects.toMatchObject({
+      code: 'not_found',
+    });
   });
 
   it('share links expose a weights-only snapshot until revoked', async () => {
