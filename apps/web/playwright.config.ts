@@ -16,7 +16,11 @@ export default defineConfig({
     command: `next build && next start -p ${PORT}`,
     url: `http://localhost:${PORT}/api/v1/status`,
     timeout: 240_000,
-    reuseExistingServer: false,
-    env: { EASYFI_DATA_DIR: DATA_DIR, NEXT_DIST_DIR: '.next-e2e' },
+    reuseExistingServer: !!process.env.E2E_REUSE,
+    env: {
+      EASYFI_DATA_DIR: DATA_DIR,
+      NEXT_DIST_DIR: '.next-e2e',
+      DEMO_AUTH_SECRET: 'e2e-only-secret',
+    },
   },
 });

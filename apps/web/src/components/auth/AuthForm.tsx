@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -24,7 +23,6 @@ const safeNext = (n: string | undefined) =>
 /** Email + password form; sign-up adds name and invite code. Posts to /api/v1/auth/*. */
 export function AuthForm({ mode, inviteCode, next, demo }: AuthFormProps) {
   const signUp = mode === 'sign-up';
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -53,8 +51,8 @@ export function AuthForm({ mode, inviteCode, next, demo }: AuthFormProps) {
       } else {
         await signIn(get('email'), String(f.get('password') ?? ''));
       }
-      router.replace(safeNext(next));
-      router.refresh();
+      // full navigation: the client router may hold a pre-login redirect for this URL
+      window.location.assign(safeNext(next));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.');
       setBusy(false);
@@ -67,8 +65,8 @@ export function AuthForm({ mode, inviteCode, next, demo }: AuthFormProps) {
     setError(null);
     try {
       await signIn(demo.email, demo.password);
-      router.replace(safeNext(next));
-      router.refresh();
+      // full navigation: the client router may hold a pre-login redirect for this URL
+      window.location.assign(safeNext(next));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Demo sign-in failed.');
       setBusy(false);

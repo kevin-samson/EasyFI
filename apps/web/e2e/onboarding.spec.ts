@@ -10,7 +10,7 @@ test('invite sign-up → portfolio → VOO + QQQ → look-through → Explorer',
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill('correct-horse-1');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('alert')).toContainText(/invite code/i);
+  await expect(page.getByRole('alert').filter({ hasText: /invite code/i })).toBeVisible();
 
   await page.getByLabel('Invite code').fill('DEMO-INVITE');
   await page.getByRole('button', { name: 'Create account' }).click();
@@ -29,7 +29,7 @@ test('invite sign-up → portfolio → VOO + QQQ → look-through → Explorer',
     ['QQQ', '5'],
   ] as const) {
     await page.getByRole('button', { name: 'Add holding' }).first().click();
-    await page.getByRole('combobox').fill(ticker);
+    await page.getByLabel('Ticker').fill(ticker);
     await page.getByLabel('Shares').fill(shares);
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(page.getByRole('rowheader', { name: new RegExp(ticker) })).toBeVisible();

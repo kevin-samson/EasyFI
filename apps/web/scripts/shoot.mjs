@@ -17,8 +17,8 @@ const res = await ctx.request.post(`${base}/api/v1/auth/sign-in`, {
 });
 if (!res.ok()) throw new Error(`sign-in failed ${res.status()}`);
 for (const p of paths) {
-  await page.goto(base + p, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(800);
+  await page.goto(base + p, { waitUntil: 'load' });
+  await page.waitForTimeout(2500);
   const name = p.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'home';
   await page.screenshot({ path: `${out}/${name}.png`, fullPage: process.env.FULL === '1' });
   console.log('shot', p, '→', `${name}.png`);

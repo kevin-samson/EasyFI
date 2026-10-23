@@ -2,7 +2,7 @@
 
 import { LogOut, Menu, X } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { api } from '@/lib/api/client';
@@ -90,7 +90,6 @@ function UserChip({ user, rail }: { user: ShellUser; rail?: boolean }) {
 }
 
 function SignOutButton({ className }: { className?: string }) {
-  const router = useRouter();
   return (
     <button
       type="button"
@@ -98,8 +97,7 @@ function SignOutButton({ className }: { className?: string }) {
       title="Sign out"
       onClick={async () => {
         await api.POST('/auth/sign-out');
-        router.replace('/sign-in');
-        router.refresh();
+        window.location.assign('/sign-in');
       }}
       className={cn(
         'ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-surface-2 hover:text-fg',

@@ -7,3 +7,6 @@ pnpm-lock.yaml
 docs
 next-env.d.ts
 apps/web/src/lib/api/schema.d.ts
+.next-e2e
+test-results
+playwright-report

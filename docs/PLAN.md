@@ -69,31 +69,33 @@ Stop when every box is ticked or only blocked tasks remain.
 - [x] Holdings page: table (Overview/Returns/Income/Look-through views), add side panel, CSV import, tags, filters, export CSV
 - [x] Portfolio page: value chart, allocation donut + diversification score, Stack view (expand per-ETF contribution)
 - [x] Home: total value, allocation, portfolios sorted by risk, exposure insights, movers
-- [ ] Playwright e2e: invite sign-up → portfolio → VOO+QQQ → look-through visible
+- [x] Playwright e2e: invite sign-up → portfolio → VOO+QQQ → look-through visible
+  - Note: `pnpm --filter @easyfi/web e2e` (builds into .next-e2e, fresh PGlite, demo LLM); also asks the Explorer.
 
 ## M5 — Compare + Constellation
-- [ ] `/compare` API + page (sector donuts, shared holdings, overlap %)
+- [x] `/compare` API + page (sector donuts, shared holdings, overlap %)
 - [x] Constellation API + d3-force view with side panel
 
 ## M6 — Dividends
-- [ ] `/dividends` API + page (KPI cards, income calendar, projection, yield leaders, holdings table)
+- [x] `/dividends` API + page (KPI cards, income calendar, projection, yield leaders, holdings table)
 
 ## M7 — Inflation
-- [ ] `/inflation` API + page (CPI snapshot, category drivers, purchasing-power calculator)
+- [x] `/inflation` API + page (CPI snapshot, category drivers, purchasing-power calculator)
 
 ## M8 — AI Investment Explorer
 - [x] OpenRouter `LLMProvider` + tool-calling loop over services; per-user daily limit
 - [x] Explorer API (threads, streamed messages, structured blocks)
-- [ ] Explorer page + Home ask bar + "Ask why" links from insights
+- [x] Explorer page + Home ask bar + "Ask why" links from insights
 - [x] Fake-LLM tests + `docs/explorer-evals.md` with 20 eval questions
 
 ## M9 — Extras
-- [ ] What-if simulator page (add fund → sector shift, overlap)
+- [x] What-if simulator page (add fund → sector shift, overlap)
 - [x] Fee drag card on portfolio
-- [ ] FI goal tracker (target number, progress, projection)
-- [ ] Alerts (email via Supabase/Resend free): concentration threshold, upcoming dividend
-- [ ] Shareable read-only snapshot link
-- [ ] Help + What's new pages, feedback form (Supabase Storage screenshot)
+- [x] FI goal tracker (target number, progress, projection)
+- [x] Alerts (email via Supabase/Resend free): concentration threshold, upcoming dividend
+  - Note: evaluated + emailed (Resend) by the nightly job, once a day per rule; "Check now" in Settings.
+- [x] Shareable read-only snapshot link
+- [x] Help + What's new pages, feedback form (Supabase Storage screenshot)
 
 ## M10 — Deploy
 - [x] Vercel project + env vars documented in `docs/DEPLOY.md`
