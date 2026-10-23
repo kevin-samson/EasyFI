@@ -104,6 +104,41 @@ export function fundHoldingsRepo(db: Db) {
       return rows.map((r) => r.asOf);
     },
 
+    /** Funds whose latest book lists `ticker`, heaviest weight first. */
+    async fundsHolding(
+      ticker: string,
+    ): Promise<{ fundTicker: string; weight: number; asOf: string }[]> {
+      const heads = await this.funds();
+      if (heads.length === 0) return [];
+      const rows = await db
+        .select({
+          fundTicker: fundHoldings.fundTicker,
+          weight: fundHoldings.weight,
+          asOf: fundHoldings.asOf,
+        })
+        .from(fundHoldings)
+        .where(eq(fundHoldings.constituentTicker, ticker));
+      const latest = new Map(heads.map((h) => [h.fundTicker, h.asOf]));
+      const acc = new Map<string, { fundTicker: string; weight: number; asOf: string }>();
+      for (const r of rows) {
+        if (latest.get(r.fundTicker) !== r.asOf) continue;
+        const cur = acc.get(r.fundTicker) ?? { fundTicker: r.fundTicker, weight: 0, asOf: r.asOf };
+        cur.weight += r.weight;
+        acc.set(r.fundTicker, cur);
+      }
+      return [...acc.values()].sort((a, b) => b.weight - a.weight);
+    },
+
+    /** Every fund with a stored book and its latest snapshot date, by ticker. */
+    async funds(): Promise<{ fundTicker: string; asOf: string }[]> {
+      const rows = await db
+        .select({ fundTicker: fundHoldings.fundTicker, asOf: max(fundHoldings.asOf) })
+        .from(fundHoldings)
+        .groupBy(fundHoldings.fundTicker)
+        .orderBy(asc(fundHoldings.fundTicker));
+      return rows.flatMap((r) => (r.asOf ? [{ fundTicker: r.fundTicker, asOf: r.asOf }] : []));
+    },
+
     /** Latest snapshot per fund. Funds without holdings are absent from the result. */
     async latest(funds: readonly string[]): Promise<Record<string, FundSnapshot>> {
       if (funds.length === 0) return {};

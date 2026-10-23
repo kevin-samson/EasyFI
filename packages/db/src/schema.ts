@@ -38,6 +38,7 @@ export type JobStatus = 'running' | 'ok' | 'partial' | 'failed';
 export const profiles = pgTable('profiles', {
   id: uuid('id').primaryKey(), // = auth user id
   displayName: text('display_name'),
+  email: text('email'),
   baseCurrency: text('base_currency').notNull().default('USD'),
   theme: text('theme').notNull().default('dark'),
   createdAt: createdAt(),
@@ -147,11 +148,14 @@ export const goals = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     userId: uuid('user_id').notNull(),
+    label: text('label').notNull().default('Financial independence'),
     targetAmount: doublePrecision('target_amount'),
     annualExpenses: doublePrecision('annual_expenses'),
     withdrawalRate: doublePrecision('withdrawal_rate'),
     monthlyContribution: doublePrecision('monthly_contribution'),
     expectedGrowth: doublePrecision('expected_growth'),
+    inflationRate: doublePrecision('inflation_rate'),
+    targetDate: day('target_date'),
     createdAt: createdAt(),
   },
   (t) => [index('goals_user_id_idx').on(t.userId)],
@@ -276,6 +280,14 @@ export const invites = pgTable('invites', {
   createdAt: createdAt(),
 });
 
+/** Local demo mode only (no Supabase): email + scrypt password hash. */
+export const localCredentials = pgTable('local_credentials', {
+  email: text('email').primaryKey(),
+  userId: uuid('user_id').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  createdAt: createdAt(),
+});
+
 export const jobRuns = pgTable(
   'job_runs',
   {
@@ -311,3 +323,4 @@ export type Dividend = typeof dividends.$inferSelect;
 export type CpiPoint = typeof cpiSeries.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
 export type JobRun = typeof jobRuns.$inferSelect;
+export type LocalCredential = typeof localCredentials.$inferSelect;

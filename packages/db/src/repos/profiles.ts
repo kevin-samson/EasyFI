@@ -4,6 +4,7 @@ import { profiles, type Profile } from '../schema';
 import { isUuid } from '../util';
 
 export interface ProfileInput {
+  email?: string | null;
   displayName?: string | null;
   baseCurrency?: string;
   theme?: string;

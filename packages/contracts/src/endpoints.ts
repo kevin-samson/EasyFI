@@ -1,0 +1,483 @@
+import { z } from './z';
+import * as S from './schemas';
+
+export type HttpMethod = 'get' | 'post' | 'patch' | 'put' | 'delete';
+
+export interface EndpointDef {
+  operationId: string;
+  method: HttpMethod;
+  /** Express-style path relative to /api/v1, e.g. '/portfolios/:id'. */
+  path: string;
+  summary: string;
+  tag: string;
+  /** false for public endpoints (sign-up, sign-in, shared snapshots, openapi). */
+  auth?: boolean;
+  params?: z.ZodObject;
+  query?: z.ZodObject;
+  body?: z.ZodType;
+  response: z.ZodType;
+  status?: 200 | 201;
+  /** Response content type when not JSON (explorer streaming). */
+  stream?: 'application/x-ndjson';
+}
+
+const IdParams = z.object({ id: z.string().min(1) });
+const TickerParams = z.object({ ticker: z.string().min(1) });
+const TokenParams = z.object({ token: z.string().min(1) });
+
+const def = <const E extends EndpointDef>(e: E) => e;
+
+export const endpoints = {
+  // ---- auth / me ----
+  signUp: def({
+    operationId: 'signUp',
+    method: 'post',
+    path: '/auth/sign-up',
+    summary: 'Create an account with an invite code',
+    tag: 'auth',
+    auth: false,
+    body: S.SignUpBody,
+    response: S.Session,
+    status: 201,
+  }),
+  signIn: def({
+    operationId: 'signIn',
+    method: 'post',
+    path: '/auth/sign-in',
+    summary: 'Sign in with email + password',
+    tag: 'auth',
+    auth: false,
+    body: S.SignInBody,
+    response: S.Session,
+  }),
+  signOut: def({
+    operationId: 'signOut',
+    method: 'post',
+    path: '/auth/sign-out',
+    summary: 'Clear the session cookie',
+    tag: 'auth',
+    auth: false,
+    response: S.Ok,
+  }),
+  getMe: def({
+    operationId: 'getMe',
+    method: 'get',
+    path: '/me',
+    summary: 'Current user profile',
+    tag: 'me',
+    response: S.Me,
+  }),
+  updateMe: def({
+    operationId: 'updateMe',
+    method: 'patch',
+    path: '/me',
+    summary: 'Update profile',
+    tag: 'me',
+    body: S.UpdateMeBody,
+    response: S.Me,
+  }),
+
+  // ---- portfolios ----
+  listPortfolios: def({
+    operationId: 'listPortfolios',
+    method: 'get',
+    path: '/portfolios',
+    summary: 'List portfolios with summary stats',
+    tag: 'portfolios',
+    response: S.PortfolioList,
+  }),
+  createPortfolio: def({
+    operationId: 'createPortfolio',
+    method: 'post',
+    path: '/portfolios',
+    summary: 'Create a portfolio',
+    tag: 'portfolios',
+    body: S.CreatePortfolioBody,
+    response: S.PortfolioSummary,
+    status: 201,
+  }),
+  getPortfolio: def({
+    operationId: 'getPortfolio',
+    method: 'get',
+    path: '/portfolios/:id',
+    summary: 'Portfolio detail',
+    tag: 'portfolios',
+    params: IdParams,
+    response: S.PortfolioDetail,
+  }),
+  updatePortfolio: def({
+    operationId: 'updatePortfolio',
+    method: 'patch',
+    path: '/portfolios/:id',
+    summary: 'Rename / retype a portfolio or set its cash',
+    tag: 'portfolios',
+    params: IdParams,
+    body: S.UpdatePortfolioBody,
+    response: S.PortfolioSummary,
+  }),
+  deletePortfolio: def({
+    operationId: 'deletePortfolio',
+    method: 'delete',
+    path: '/portfolios/:id',
+    summary: 'Delete a portfolio and its holdings',
+    tag: 'portfolios',
+    params: IdParams,
+    response: S.Ok,
+  }),
+  getLookThrough: def({
+    operationId: 'getLookThrough',
+    method: 'get',
+    path: '/portfolios/:id/lookthrough',
+    summary: 'Effective exposure folded by company / sector / industry / asset',
+    tag: 'portfolios',
+    params: IdParams,
+    query: z.object({ fold: S.FoldBy.default('company') }),
+    response: S.LookThrough,
+  }),
+  getConstellation: def({
+    operationId: 'getConstellation',
+    method: 'get',
+    path: '/portfolios/:id/constellation',
+    summary: 'Fund hubs and the holdings they share',
+    tag: 'portfolios',
+    params: IdParams,
+    response: S.Constellation,
+  }),
+  getValueSeries: def({
+    operationId: 'getValueSeries',
+    method: 'get',
+    path: '/portfolios/:id/value-series',
+    summary: 'Current shares replayed over past closes, for every range (id may be "all")',
+    tag: 'portfolios',
+    params: IdParams,
+    response: S.ValueSeriesSet,
+  }),
+
+  // ---- holdings ----
+  listHoldings: def({
+    operationId: 'listHoldings',
+    method: 'get',
+    path: '/portfolios/:id/holdings',
+    summary: 'Holdings with prices, returns and income',
+    tag: 'holdings',
+    params: IdParams,
+    response: S.HoldingList,
+  }),
+  createHolding: def({
+    operationId: 'createHolding',
+    method: 'post',
+    path: '/portfolios/:id/holdings',
+    summary: 'Add a holding',
+    tag: 'holdings',
+    params: IdParams,
+    body: S.CreateHoldingBody,
+    response: S.HoldingRow,
+    status: 201,
+  }),
+  bulkHoldings: def({
+    operationId: 'bulkHoldings',
+    method: 'post',
+    path: '/portfolios/:id/holdings/bulk',
+    summary: 'Delete or tag several holdings',
+    tag: 'holdings',
+    params: IdParams,
+    body: S.BulkHoldingsBody,
+    response: z.object({ affected: z.number().int() }),
+  }),
+  importHoldings: def({
+    operationId: 'importHoldings',
+    method: 'post',
+    path: '/portfolios/:id/import',
+    summary: 'Import holdings from a broker CSV',
+    tag: 'holdings',
+    params: IdParams,
+    body: S.CsvImportBody,
+    response: S.CsvImportResult,
+  }),
+  updateHolding: def({
+    operationId: 'updateHolding',
+    method: 'patch',
+    path: '/holdings/:id',
+    summary: 'Edit a holding',
+    tag: 'holdings',
+    params: IdParams,
+    body: S.UpdateHoldingBody,
+    response: S.HoldingRow,
+  }),
+  deleteHolding: def({
+    operationId: 'deleteHolding',
+    method: 'delete',
+    path: '/holdings/:id',
+    summary: 'Remove a holding',
+    tag: 'holdings',
+    params: IdParams,
+    response: S.Ok,
+  }),
+
+  // ---- aggregate views ----
+  getHome: def({
+    operationId: 'getHome',
+    method: 'get',
+    path: '/home',
+    summary: 'Home dashboard aggregate',
+    tag: 'home',
+    response: S.Home,
+  }),
+  compare: def({
+    operationId: 'compare',
+    method: 'get',
+    path: '/compare',
+    summary: 'Compare two funds or portfolios (sectors, shared holdings, overlap)',
+    tag: 'compare',
+    query: z.object({ a: z.string().default('VOO'), b: z.string().default('QQQ') }),
+    response: S.Comparison,
+  }),
+  getDividends: def({
+    operationId: 'getDividends',
+    method: 'get',
+    path: '/dividends',
+    summary: 'Dividend income: KPIs, calendar, projection, leaders',
+    tag: 'dividends',
+    query: z.object({ portfolio: z.string().default('all') }),
+    response: S.Dividends,
+  }),
+  getInflation: def({
+    operationId: 'getInflation',
+    method: 'get',
+    path: '/inflation',
+    summary: 'CPI snapshot and category drivers',
+    tag: 'inflation',
+    response: S.Inflation,
+  }),
+  purchasingPower: def({
+    operationId: 'purchasingPower',
+    method: 'post',
+    path: '/inflation/purchasing-power',
+    summary: 'Nominal vs real growth projection',
+    tag: 'inflation',
+    body: S.PurchasingPowerBody,
+    response: S.PurchasingPowerResult,
+  }),
+  whatIf: def({
+    operationId: 'whatIf',
+    method: 'post',
+    path: '/whatif',
+    summary: 'Simulate adding a fund or stock',
+    tag: 'whatif',
+    body: S.WhatIfBody,
+    response: S.WhatIfResult,
+  }),
+
+  // ---- securities ----
+  searchSecurities: def({
+    operationId: 'searchSecurities',
+    method: 'get',
+    path: '/securities/search',
+    summary: 'Search tickers and names',
+    tag: 'securities',
+    query: z.object({
+      q: z.string().default(''),
+      limit: z.coerce.number().int().min(1).max(50).default(10),
+    }),
+    response: S.SecuritySearchResult,
+  }),
+  getSecurity: def({
+    operationId: 'getSecurity',
+    method: 'get',
+    path: '/securities/:ticker',
+    summary: 'Security detail with top holdings for funds',
+    tag: 'securities',
+    params: TickerParams,
+    response: S.SecurityDetail,
+  }),
+
+  // ---- explorer ----
+  listThreads: def({
+    operationId: 'listThreads',
+    method: 'get',
+    path: '/explorer/threads',
+    summary: 'Explorer threads, suggestions and usage',
+    tag: 'explorer',
+    response: S.ExplorerThreadList,
+  }),
+  createThread: def({
+    operationId: 'createThread',
+    method: 'post',
+    path: '/explorer/threads',
+    summary: 'Start a thread',
+    tag: 'explorer',
+    body: S.CreateThreadBody,
+    response: S.ExplorerThread,
+    status: 201,
+  }),
+  getThread: def({
+    operationId: 'getThread',
+    method: 'get',
+    path: '/explorer/threads/:id',
+    summary: 'Thread with messages',
+    tag: 'explorer',
+    params: IdParams,
+    response: S.ExplorerThread,
+  }),
+  deleteThread: def({
+    operationId: 'deleteThread',
+    method: 'delete',
+    path: '/explorer/threads/:id',
+    summary: 'Delete a thread',
+    tag: 'explorer',
+    params: IdParams,
+    response: S.Ok,
+  }),
+  postMessage: def({
+    operationId: 'postMessage',
+    method: 'post',
+    path: '/explorer/threads/:id/messages',
+    summary: 'Ask a question; streams ExplorerStreamEvent lines',
+    tag: 'explorer',
+    params: IdParams,
+    body: S.PostMessageBody,
+    response: S.ExplorerStreamEvent,
+    stream: 'application/x-ndjson',
+  }),
+
+  // ---- settings ----
+  listInvites: def({
+    operationId: 'listInvites',
+    method: 'get',
+    path: '/invites',
+    summary: 'Invite codes (admin)',
+    tag: 'settings',
+    response: z.object({ invites: z.array(S.Invite) }),
+  }),
+  createInvite: def({
+    operationId: 'createInvite',
+    method: 'post',
+    path: '/invites',
+    summary: 'Create an invite code (admin)',
+    tag: 'settings',
+    body: S.CreateInviteBody,
+    response: S.Invite,
+    status: 201,
+  }),
+  listShareLinks: def({
+    operationId: 'listShareLinks',
+    method: 'get',
+    path: '/share-links',
+    summary: 'Read-only share links',
+    tag: 'settings',
+    response: z.object({ links: z.array(S.ShareLink) }),
+  }),
+  createShareLink: def({
+    operationId: 'createShareLink',
+    method: 'post',
+    path: '/share-links',
+    summary: 'Create a read-only snapshot link for a portfolio',
+    tag: 'settings',
+    body: S.CreateShareLinkBody,
+    response: S.ShareLink,
+    status: 201,
+  }),
+  revokeShareLink: def({
+    operationId: 'revokeShareLink',
+    method: 'delete',
+    path: '/share-links/:token',
+    summary: 'Revoke a share link',
+    tag: 'settings',
+    params: TokenParams,
+    response: S.Ok,
+  }),
+  getSharedSnapshot: def({
+    operationId: 'getSharedSnapshot',
+    method: 'get',
+    path: '/shared/:token',
+    summary: 'Public read-only portfolio snapshot',
+    tag: 'settings',
+    auth: false,
+    params: TokenParams,
+    response: S.SharedSnapshot,
+  }),
+  listAlerts: def({
+    operationId: 'listAlerts',
+    method: 'get',
+    path: '/alerts',
+    summary: 'Alert rules',
+    tag: 'settings',
+    response: z.object({ alerts: z.array(S.Alert) }),
+  }),
+  upsertAlert: def({
+    operationId: 'upsertAlert',
+    method: 'put',
+    path: '/alerts',
+    summary: 'Create or update the alert rule of a kind',
+    tag: 'settings',
+    body: S.UpsertAlertBody,
+    response: S.Alert,
+  }),
+  checkAlerts: def({
+    operationId: 'checkAlerts',
+    method: 'post',
+    path: '/alerts/check',
+    summary: 'Evaluate alert rules now (also run nightly)',
+    tag: 'settings',
+    response: S.AlertCheck,
+  }),
+  listGoals: def({
+    operationId: 'listGoals',
+    method: 'get',
+    path: '/goals',
+    summary: 'FI goals with progress',
+    tag: 'goals',
+    response: z.object({ goals: z.array(S.Goal) }),
+  }),
+  createGoal: def({
+    operationId: 'createGoal',
+    method: 'post',
+    path: '/goals',
+    summary: 'Create an FI goal',
+    tag: 'goals',
+    body: S.GoalBody,
+    response: S.Goal,
+    status: 201,
+  }),
+  updateGoal: def({
+    operationId: 'updateGoal',
+    method: 'patch',
+    path: '/goals/:id',
+    summary: 'Update an FI goal',
+    tag: 'goals',
+    params: IdParams,
+    body: S.GoalBody,
+    response: S.Goal,
+  }),
+  deleteGoal: def({
+    operationId: 'deleteGoal',
+    method: 'delete',
+    path: '/goals/:id',
+    summary: 'Delete an FI goal',
+    tag: 'goals',
+    params: IdParams,
+    response: S.Ok,
+  }),
+  sendFeedback: def({
+    operationId: 'sendFeedback',
+    method: 'post',
+    path: '/feedback',
+    summary: 'Send feedback with an optional screenshot',
+    tag: 'settings',
+    body: S.FeedbackBody,
+    response: S.Ok,
+    status: 201,
+  }),
+  getStatus: def({
+    operationId: 'getStatus',
+    method: 'get',
+    path: '/status',
+    summary: 'Data freshness and last nightly job',
+    tag: 'status',
+    auth: false,
+    response: S.Status,
+  }),
+} satisfies Record<string, EndpointDef>;
+
+export type Endpoints = typeof endpoints;
+export type EndpointName = keyof Endpoints;

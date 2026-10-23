@@ -74,6 +74,16 @@ export function explorerRepo(db: Db) {
       });
     },
 
+    async renameThread(userId: string, id: string, title: string): Promise<boolean> {
+      if (!isUuid(id)) return false;
+      const rows = await db
+        .update(explorerThreads)
+        .set({ title })
+        .where(ownedThread(userId, id))
+        .returning({ id: explorerThreads.id });
+      return rows.length > 0;
+    },
+
     async deleteThread(userId: string, id: string): Promise<boolean> {
       if (!isUuid(id)) return false;
       const rows = await db

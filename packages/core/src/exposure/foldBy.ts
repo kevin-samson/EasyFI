@@ -37,7 +37,7 @@ export const ASSET_LABELS: Record<AssetBucket, string> = {
 /** Kinds shown in company lists (tails, unmapped lines and cash are excluded). */
 const COMPANY_KINDS = new Set<Exposure['kind']>(['company', 'fund', 'asset']);
 
-function keyOf(e: Exposure, by: FoldDimension): { key: string; label: string } | null {
+export function foldKey(e: Exposure, by: FoldDimension): { key: string; label: string } | null {
   if (by === 'company') {
     return COMPANY_KINDS.has(e.kind) ? { key: e.key, label: e.name } : null;
   }
@@ -73,7 +73,7 @@ export function foldBy(result: LookThroughResult, by: FoldDimension): FoldGroup[
   };
 
   for (const e of result.exposures) {
-    const k = keyOf(e, by);
+    const k = foldKey(e, by);
     if (k) bump(k.key, k.label, e.value, e.sources);
   }
   if (by !== 'company' && result.unresolved.value > 0) {

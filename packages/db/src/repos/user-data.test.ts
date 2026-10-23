@@ -131,6 +131,9 @@ describe('explorer + llm usage', () => {
       blocks: [{ type: 'table', rows: [[1, 2]] }],
     });
     expect(await r.explorer.appendMessage(B, t.id, { role: 'user', content: 'x' })).toBeNull();
+    expect(await r.explorer.renameThread(B, t.id, 'pwned')).toBe(false);
+    expect(await r.explorer.renameThread(A, t.id, 'Renamed')).toBe(true);
+    expect((await r.explorer.getThread(A, t.id))!.title).toBe('Renamed');
     expect(await r.explorer.getThread(B, t.id)).toBeNull();
     const full = await r.explorer.getThread(A, t.id);
     expect(full!.messages.map((m) => m.content)).toEqual(['hi', 'hello']);
@@ -198,5 +201,18 @@ describe('alerts, goals, share links, feedback', () => {
       message: 'nice',
       screenshotPath: null,
     });
+  });
+});
+
+describe('local credentials', () => {
+  it('create is unique per email (case-insensitive) and get finds it', async () => {
+    expect(await r.credentials.create({ email: 'Ann@x.io', userId: A, passwordHash: 'h' })).toBe(
+      true,
+    );
+    expect(await r.credentials.create({ email: 'ann@x.io', userId: B, passwordHash: 'h2' })).toBe(
+      false,
+    );
+    expect(await r.credentials.get('ANN@x.io')).toMatchObject({ userId: A, passwordHash: 'h' });
+    expect(await r.credentials.get('nobody@x.io')).toBeNull();
   });
 });

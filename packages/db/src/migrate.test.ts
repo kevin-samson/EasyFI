@@ -34,6 +34,7 @@ describe('migrations', () => {
       'invites',
       'job_runs',
       'llm_usage',
+      'local_credentials',
       'portfolios',
       'prices_eod',
       'profiles',

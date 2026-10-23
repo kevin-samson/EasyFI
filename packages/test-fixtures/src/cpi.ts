@@ -31,6 +31,12 @@ export const CPI_SERIES: Record<string, SeriesSpec> = {
   CUUR0000SAA: { label: 'Apparel', start: 128.9, annual: 0.006, noise: 0.01 },
   CUUR0000SAT: { label: 'Transportation', start: 270.3, annual: 0.018, noise: 0.008 },
   CUUR0000SETA02: { label: 'Used cars and trucks', start: 183.4, annual: -0.012, noise: 0.012 },
+  CUUR0000SA0L1E: {
+    label: 'All items less food and energy',
+    start: 311.2,
+    annual: 0.031,
+    noise: 0.0012,
+  },
 };
 
 function periods(): string[] {

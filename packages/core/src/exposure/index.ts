@@ -12,3 +12,6 @@ export * from './exposureInsights';
 export * from './constellationGraph';
 export * from './whatIf';
 export * from './feeDrag';
+export * from './dayChange';
+export * from './pairwiseOverlap';
+export * from './coverage';

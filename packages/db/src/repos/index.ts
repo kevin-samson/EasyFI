@@ -2,6 +2,7 @@ import type { Db } from '../client';
 import { alertsRepo } from './alerts';
 import { cashRepo } from './cash';
 import { cpiRepo } from './cpi';
+import { credentialsRepo } from './credentials';
 import { dividendsRepo } from './dividends';
 import { explorerRepo } from './explorer';
 import { feedbackRepo } from './feedback';
@@ -35,6 +36,7 @@ export function createRepos(db: Db) {
     dividends: dividendsRepo(db),
     cpi: cpiRepo(db),
     invites: invitesRepo(db),
+    credentials: credentialsRepo(db),
     jobs: jobsRepo(db),
   };
 }
@@ -45,6 +47,7 @@ export {
   alertsRepo,
   cashRepo,
   cpiRepo,
+  credentialsRepo,
   dividendsRepo,
   explorerRepo,
   feedbackRepo,

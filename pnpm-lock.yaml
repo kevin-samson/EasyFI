@@ -174,16 +174,15 @@ importers:
       '@easyfi/db':
         specifier: workspace:*
         version: link:../db
+      '@easyfi/test-fixtures':
+        specifier: workspace:*
+        version: link:../test-fixtures
       jose:
         specifier: ^6.2.13
         version: 6.2.13
       zod:
         specifier: ^4.6.7
         version: 4.6.7
-    devDependencies:
-      '@easyfi/test-fixtures':
-        specifier: workspace:*
-        version: link:../test-fixtures
 
   packages/test-fixtures: {}
 

@@ -4,6 +4,9 @@ import { goals, type Goal } from '../schema';
 import { isUuid } from '../util';
 
 export interface GoalInput {
+  label?: string;
+  inflationRate?: number | null;
+  targetDate?: string | null;
   targetAmount?: number | null;
   annualExpenses?: number | null;
   withdrawalRate?: number | null;

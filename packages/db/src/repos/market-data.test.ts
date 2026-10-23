@@ -132,6 +132,11 @@ describe('fund holdings', () => {
       ['AAPL', 0.3],
     ]);
     expect(latest.VOO!.sectorWeights).toEqual([{ sector: 'Tech', weight: 0.3 }]);
+    expect(await r.fundHoldings.funds()).toEqual([{ fundTicker: 'VOO', asOf: '2026-06-30' }]);
+    expect(await r.fundHoldings.fundsHolding('AAPL')).toEqual([
+      { fundTicker: 'VOO', weight: 0.3, asOf: '2026-06-30' },
+    ]);
+    expect(await r.fundHoldings.fundsHolding('ZZZ')).toEqual([]);
   });
 });
 
@@ -171,6 +176,7 @@ describe('invites', () => {
     expect(await r.invites.redeem('FRIENDS')).toBe(false);
     expect(await r.invites.redeem('MISSING')).toBe(false);
     expect(await r.invites.get('FRIENDS')).toMatchObject({ maxUses: 2, used: 2 });
+    expect((await r.invites.list()).map((i) => i.code)).toEqual(['FRIENDS']);
   });
 });
 

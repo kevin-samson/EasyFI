@@ -1,4 +1,4 @@
-import { and, eq, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import type { Db } from '../client';
 import { invites, type Invite } from '../schema';
 
@@ -7,6 +7,10 @@ export function invitesRepo(db: Db) {
     async create(input: { code: string; maxUses?: number }): Promise<Invite> {
       const [row] = await db.insert(invites).values(input).returning();
       return row!;
+    },
+
+    list(): Promise<Invite[]> {
+      return db.select().from(invites).orderBy(desc(invites.createdAt));
     },
 
     async get(code: string): Promise<Invite | null> {
