@@ -92,6 +92,13 @@ export const EXPLORER_SUGGESTIONS = [
 ];
 
 const MAX_TOOL_ROUNDS = 4;
+
+const pct = (w: number | null | undefined, digits = 1) =>
+  w == null ? 'n/a' : `${(w * 100).toFixed(digits)}%`;
+const usd = (v: number | null | undefined) =>
+  v == null ? 'n/a' : `$${Math.round(v).toLocaleString('en-US')}`;
+const list = (xs: string[]) =>
+  xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`;
 const HISTORY_MESSAGES = 10;
 
 interface ToolOutcome {
@@ -142,6 +149,14 @@ export function explorerService(ctx: Ctx, deps: Deps) {
         const fundCols = lt.sourceOrder.slice(0, 4);
         return {
           result: {
+            summary:
+              `Looking through your funds, ${sectors[0] ? `${sectors[0].name} is your largest sector at ${pct(sectors[0].weight)}` : 'no sector data is available'}` +
+              (top.length
+                ? `, and your biggest company exposures are ${list(top.slice(0, 3).map((r) => `${r.ticker} (${pct(r.weight)})`))}.`
+                : '.') +
+              (lt.unresolved.weight > 0.005
+                ? ` ${pct(lt.unresolved.weight)} has no look-through data and is left out of the score.`
+                : ''),
             scope: id === 'all' ? 'all portfolios' : id,
             totalValue: Math.round(lt.totalValue),
             unresolvedWeight: lt.unresolved.weight,
@@ -182,6 +197,11 @@ export function explorerService(ctx: Ctx, deps: Deps) {
         const shared = c.shared.slice(0, 8);
         return {
           result: {
+            summary:
+              `${c.a.ticker} and ${c.b.ticker} overlap ${pct(c.overlapByWeight, 0)} by weight, sharing ${c.sharedCount} holdings` +
+              (shared.length
+                ? `; the largest shared names are ${list(shared.slice(0, 3).map((x) => x.ticker))}.`
+                : '.'),
             a: c.a.ticker,
             b: c.b.ticker,
             overlapByWeight: c.overlapByWeight,
@@ -226,6 +246,14 @@ export function explorerService(ctx: Ctx, deps: Deps) {
         const shifts = r.sectorShifts.slice(0, 6);
         return {
           result: {
+            summary:
+              `Adding ${usd(amount)} of ${ticker} would move your diversification score from ${r.before.score} to ${r.after.score}.` +
+              (shifts[0]
+                ? ` The biggest sector change is ${shifts[0].sector}: ${pct(shifts[0].before)} → ${pct(shifts[0].after)}.`
+                : '') +
+              (r.overlaps[0]
+                ? ` It overlaps most with ${r.overlaps[0].fund} (${pct(r.overlaps[0].overlapByWeight, 0)} by weight).`
+                : ''),
             ticker,
             amount,
             scoreBefore: r.before.score,
@@ -258,6 +286,9 @@ export function explorerService(ctx: Ctx, deps: Deps) {
         );
         return {
           result: {
+            summary: funds.length
+              ? `${funds.length} fund${funds.length === 1 ? '' : 's'} with stored holdings contain ${ticker}; the heaviest are ${list(funds.slice(0, 3).map((f) => `${f.fundTicker} (${pct(f.weight)})`))}.`
+              : `None of the funds with stored holdings list ${ticker}.`,
             ticker,
             funds: funds.map((f) => ({ fund: f.fundTicker, weight: f.weight })),
             asOf: funds[0]?.asOf ?? null,
@@ -283,6 +314,12 @@ export function explorerService(ctx: Ctx, deps: Deps) {
         const top = d.holdings.slice(0, 6);
         return {
           result: {
+            summary:
+              `Over the last 12 months your holdings paid about ${usd(d.kpis.trailing12m)} (yield ${pct(d.kpis.portfolioYield, 2)}); ` +
+              `about ${usd(d.kpis.next30Days)} is expected in the next 30 days` +
+              (top[0]
+                ? `, and ${top[0].ticker} is your largest payer (${pct(top[0].shareOfIncome, 0)} of income).`
+                : '.'),
             trailing12m: d.kpis.trailing12m,
             portfolioYield: d.kpis.portfolioYield,
             next30Days: d.kpis.next30Days,
@@ -330,7 +367,17 @@ export function explorerService(ctx: Ctx, deps: Deps) {
 
   return {
     async list(userId: string): Promise<ExplorerThreadList> {
-      const threads = await ctx.repos.explorer.listThreads(userId);
+      const all = await ctx.repos.explorer.listThreads(userId);
+      // hide never-used "New chat" threads (e.g. a first send that was interrupted)
+      const threads = [];
+      for (const t of all) {
+        if (
+          t.title === 'New chat' &&
+          !(await ctx.repos.explorer.getThread(userId, t.id))?.messages.length
+        )
+          continue;
+        threads.push(t);
+      }
       return {
         threads: threads.map((t) => ({
           id: t.id,
@@ -367,13 +414,16 @@ export function explorerService(ctx: Ctx, deps: Deps) {
     ): Promise<ChatMessage> {
       const thread = await ctx.repos.explorer.getThread(userId, threadId);
       if (!thread) throw notFound('Thread');
-      const used = await ctx.repos.explorer.incrementUsage(userId, ctx.today());
-      if (used > ctx.config.explorerDailyLimit) {
+      // check before counting so rejected questions don't use up tomorrow's budget
+      if (
+        (await ctx.repos.explorer.getUsage(userId, ctx.today())) >= ctx.config.explorerDailyLimit
+      ) {
         throw new ServiceError(
           'rate_limited',
           `Daily limit of ${ctx.config.explorerDailyLimit} questions reached — try again tomorrow`,
         );
       }
+      await ctx.repos.explorer.incrementUsage(userId, ctx.today());
       await ctx.repos.explorer.appendMessage(userId, threadId, { role: 'user', content: text });
       if (thread.messages.length === 0 && thread.title === 'New chat') {
         await ctx.repos.explorer.renameThread(

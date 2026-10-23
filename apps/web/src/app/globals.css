@@ -46,6 +46,7 @@
   --c5: #ff6baa; /* pink */
   --c6: #22d3ee; /* cyan */
   --c-other: #6b7686; /* slate */
+  --c-unresolved: #3a4350;
 
   --track: #1e2838;
   --glow: rgb(79 134 255 / 0.35);
@@ -89,6 +90,7 @@
   --c5: #e8508f;
   --c6: #0fb5d1;
   --c-other: #8a94a3;
+  --c-unresolved: #c9cfd8;
 
   --track: #e6eaf1;
   --glow: rgb(59 111 240 / 0.25);

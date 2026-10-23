@@ -11,3 +11,7 @@ test-results/
 next-env.d.ts
 *.tsbuildinfo
 .easyfi-data/
+.e2e-data-*/
+.next-e2e/
+test-results/
+playwright-report/

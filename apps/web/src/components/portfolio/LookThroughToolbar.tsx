@@ -21,6 +21,7 @@ const FOLDS: { value: FoldBy; label: string }[] = [
   { value: 'company', label: 'Company' },
   { value: 'sector', label: 'Sector' },
   { value: 'industry', label: 'Industry' },
+  { value: 'asset', label: 'Assets' },
 ];
 
 /** Fold tabs (Company / Sector / Industry) + view toggle (Constellation / Stack). URL-driven. */

@@ -11,9 +11,12 @@ export const CHART_COLORS = [
   'var(--c6)',
 ] as const;
 export const OTHER_COLOR = 'var(--c-other)';
+/** Slice we could not look through (fund without holdings data). */
+export const UNRESOLVED_COLOR = 'var(--c-unresolved, var(--faint))';
 
 export function seriesColor(index: number, label?: string) {
   if (label && /^other$/i.test(label)) return OTHER_COLOR;
+  if (label && /^no look-through data$/i.test(label)) return UNRESOLVED_COLOR;
   return CHART_COLORS[index % CHART_COLORS.length] ?? OTHER_COLOR;
 }
 

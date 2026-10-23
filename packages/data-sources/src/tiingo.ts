@@ -78,6 +78,23 @@ export class TiingoClient implements PriceSource, DividendSource {
       .map((r) => ({ ticker, exDate: r.date.slice(0, 10), payDate: null, amount: r.divCash! }));
   }
 
+  /** Prices and dividends from one EOD request (saves Tiingo's hourly request budget). */
+  async eodWithDividends(
+    ticker: string,
+    from: IsoDate,
+    to: IsoDate,
+  ): Promise<{ prices: PricePoint[]; dividends: DividendEvent[] }> {
+    const rows = await this.eodRows(ticker, from, to);
+    return {
+      prices: rows
+        .filter((r) => typeof r.close === 'number' && Number.isFinite(r.close))
+        .map((r) => ({ ticker, date: r.date.slice(0, 10), close: r.close })),
+      dividends: rows
+        .filter((r) => typeof r.divCash === 'number' && r.divCash > 0)
+        .map((r) => ({ ticker, exDate: r.date.slice(0, 10), payDate: null, amount: r.divCash! })),
+    };
+  }
+
   async meta(ticker: string): Promise<Partial<Security> | null> {
     const res = await this.get(`/tiingo/daily/${encodeURIComponent(toTiingoTicker(ticker))}`, {});
     if (!res) return null;

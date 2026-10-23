@@ -14,7 +14,10 @@
     "format:check": "prettier --check .",
     "verify": "pnpm format:check && pnpm test:repo && turbo run lint typecheck test build",
     "test": "turbo run test",
-    "test:repo": "vitest run --root tooling"
+    "test:repo": "vitest run --root tooling",
+    "job:nightly": "pnpm --filter @easyfi/jobs job:nightly",
+    "db:generate": "pnpm --filter @easyfi/db db:generate",
+    "db:migrate": "pnpm --filter @easyfi/db db:migrate"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

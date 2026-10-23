@@ -1,17 +1,4 @@
-export type CpiPoint = { period: string; yoy: number };
-
-/** Headline CPI. `period` is "YYYY-MM"; rates are fractions. */
-export type CpiSnapshot = {
-  period: string;
-  yoy: number | null;
-  mom: number | null;
-  coreYoy: number | null;
-  asOf: string | null;
-  history: CpiPoint[];
-};
-
-/** One CPI component: year-over-year change and relative weight in the basket (fractions). */
-export type CpiCategory = { key: string; label: string; yoy: number | null; weight: number };
+export type { CpiCategory, CpiSnapshot } from '@easyfi/contracts';
 
 export type PurchasingPowerInput = {
   amount: number;
@@ -21,9 +8,11 @@ export type PurchasingPowerInput = {
   years: number;
 };
 
-export type PurchasingPowerPoint = {
-  year: number;
-  nominal: number;
-  real: number;
-  contributed: number;
+/** Calculator defaults (the inflation page overrides amount/inflation with live values). */
+export const PURCHASING_POWER_DEFAULTS: PurchasingPowerInput = {
+  amount: 75_000,
+  monthlyContribution: 500,
+  inflationRate: 0.029,
+  growthRate: 0.06,
+  years: 20,
 };

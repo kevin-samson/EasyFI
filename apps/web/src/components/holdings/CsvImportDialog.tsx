@@ -13,8 +13,10 @@ export type CsvImportDialogProps = {
   onClose: () => void;
   /** Text pre-filled in the paste box (sample export). */
   sample?: string;
-  /** Parse + import on the server. Not wired yet. */
-  action?: (data: CsvImportInput) => void | Promise<void>;
+  /** Parse + import on the server; resolves with what was imported. */
+  action: (
+    data: CsvImportInput & { replace: boolean },
+  ) => Promise<{ imported: number; warnings: { line: number; message: string }[] }>;
 };
 
 const BROKERS: { value: CsvBroker; label: string }[] = [
@@ -41,34 +43,80 @@ export function CsvImportDialog({ open, onClose, sample = '', action }: CsvImpor
   const [csv, setCsv] = useState(sample);
   const [broker, setBroker] = useState<CsvBroker>('auto');
   const [fileName, setFileName] = useState<string | null>(null);
+  const [replace, setReplace] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    imported: number;
+    warnings: { line: number; message: string }[];
+  } | null>(null);
   const parsed = useMemo(() => preview(csv), [csv]);
   const rowCount = parsed?.rows.length ?? 0;
+
+  const close = () => {
+    setResult(null);
+    setError(null);
+    onClose();
+  };
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await action({ broker, csv, replace });
+      if (r.warnings.length) setResult(r);
+      else close();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Import failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Overlay
       open={open}
-      onClose={onClose}
+      onClose={close}
       variant="modal"
       title="Import from CSV"
       description="Export positions from your broker, then paste the file contents or upload it."
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
+          <Button variant="ghost" onClick={close}>
+            {result ? 'Done' : 'Cancel'}
           </Button>
-          <Button
-            variant="primary"
-            disabled={rowCount === 0}
-            onClick={async () => {
-              await action?.({ broker, csv });
-              onClose();
-            }}
-          >
-            Import {rowCount ? `${rowCount} ${rowCount === 1 ? 'row' : 'rows'}` : ''}
-          </Button>
+          {result ? null : (
+            <Button variant="primary" disabled={rowCount === 0 || busy} onClick={() => void run()}>
+              {busy
+                ? 'Importing…'
+                : `Import ${rowCount ? `${rowCount} ${rowCount === 1 ? 'row' : 'rows'}` : ''}`}
+            </Button>
+          )}
         </>
       }
     >
+      {error ? (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg bg-[var(--sev-high-bg)] px-3 py-2 text-[13px] text-[var(--sev-high-fg)]"
+        >
+          {error}
+        </p>
+      ) : null}
+      {result ? (
+        <div role="status" className="mb-4 rounded-lg bg-brand/10 px-3 py-2 text-[13px] text-fg">
+          <p className="font-medium text-brand">
+            Imported {result.imported} {result.imported === 1 ? 'holding' : 'holdings'}.
+          </p>
+          <ul className="mt-1 list-disc pl-5 text-muted">
+            {result.warnings.slice(0, 8).map((w) => (
+              <li key={`${w.line}-${w.message}`}>
+                Line {w.line}: {w.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
         <Field label="Paste CSV">
           <textarea
@@ -93,6 +141,15 @@ export function CsvImportDialog({ open, onClose, sample = '', action }: CsvImpor
               ))}
             </Select>
           </Field>
+          <label className="flex items-center gap-2 text-[13px] text-muted">
+            <input
+              type="checkbox"
+              checked={replace}
+              onChange={(e) => setReplace(e.target.checked)}
+              className="h-4 w-4 accent-[var(--brand)]"
+            />
+            Replace current holdings
+          </label>
           <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-line-strong px-3 py-4 text-center text-[13px] text-muted hover:bg-surface-2 focus-within:outline-2 focus-within:outline-brand">
             <FileUp aria-hidden className="h-5 w-5 text-faint" />
             <span className="font-medium text-fg">{fileName ?? 'Upload .csv file'}</span>

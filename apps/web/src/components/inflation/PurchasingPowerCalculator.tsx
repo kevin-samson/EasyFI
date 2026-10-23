@@ -1,6 +1,7 @@
 'use client';
 
-import { type ChangeEvent, useState } from 'react';
+import type { PurchasingPowerResult } from '@easyfi/contracts';
+import { type ChangeEvent, useEffect, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -13,47 +14,19 @@ import {
 } from 'recharts';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Field, TextInput } from '@/components/ui/Field';
+import { api, ApiError, unwrap } from '@/lib/api/client';
+import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/format';
-import type { PurchasingPowerInput, PurchasingPowerPoint } from './types';
+import { PURCHASING_POWER_DEFAULTS, type PurchasingPowerInput } from './types';
 
-/**
- * Display-only preview so the form responds instantly. The canonical calculation will come from
- * packages/core via /api/v1 (pass `project` to swap it in).
- */
-export function previewProjection(i: PurchasingPowerInput): PurchasingPowerPoint[] {
-  const out: PurchasingPowerPoint[] = [];
-  let nominal = i.amount;
-  let contributed = i.amount;
-  for (let y = 0; y <= i.years; y++) {
-    if (y > 0) {
-      for (let m = 0; m < 12; m++) {
-        nominal = nominal * (1 + i.growthRate / 12) + i.monthlyContribution;
-        contributed += i.monthlyContribution;
-      }
-    }
-    out.push({
-      year: y,
-      nominal: Math.round(nominal),
-      real: Math.round(nominal / (1 + i.inflationRate) ** y),
-      contributed: Math.round(contributed),
-    });
-  }
-  return out;
-}
-
-const DEFAULTS: PurchasingPowerInput = {
-  amount: 75_000,
-  monthlyContribution: 500,
-  inflationRate: 0.029,
-  growthRate: 0.06,
-  years: 20,
-};
+const MAX_YEARS = 80;
+const DEBOUNCE_MS = 300;
 
 type FormState = Record<keyof PurchasingPowerInput, string>;
 
 function toForm(i: PurchasingPowerInput): FormState {
   return {
-    amount: String(i.amount),
+    amount: String(Math.round(i.amount)),
     monthlyContribution: String(i.monthlyContribution),
     inflationRate: String(+(i.inflationRate * 100).toFixed(2)),
     growthRate: String(+(i.growthRate * 100).toFixed(2)),
@@ -61,8 +34,9 @@ function toForm(i: PurchasingPowerInput): FormState {
   };
 }
 
+/** Form strings → request body (percent → fraction); null when a field is not a usable number. */
 function parse(f: FormState): PurchasingPowerInput | null {
-  const n = (s: string) => Number(s.replace(/[$,%\s]/g, ''));
+  const n = (s: string) => (s.trim() === '' ? NaN : Number(s.replace(/[$,%\s]/g, '')));
   const v = {
     amount: n(f.amount),
     monthlyContribution: n(f.monthlyContribution),
@@ -70,21 +44,68 @@ function parse(f: FormState): PurchasingPowerInput | null {
     growthRate: n(f.growthRate) / 100,
     years: Math.round(n(f.years)),
   };
-  if (Object.values(v).some((x) => !Number.isFinite(x)) || v.years < 1 || v.years > 60) return null;
+  if (Object.values(v).some((x) => !Number.isFinite(x))) return null;
+  if (v.amount < 0 || v.monthlyContribution < 0) return null;
+  if (v.years < 1 || v.years > MAX_YEARS) return null;
+  if (v.inflationRate < -0.5 || v.inflationRate > 1) return null;
+  if (v.growthRate < -0.9 || v.growthRate > 1) return null;
   return v;
 }
 
+type Projection = { input: PurchasingPowerInput; result: PurchasingPowerResult };
+
+/**
+ * Nominal vs inflation-adjusted growth. The projection is computed server-side
+ * (POST /inflation/purchasing-power → packages/core), debounced as the user types.
+ */
 export function PurchasingPowerCalculator({
-  initial = DEFAULTS,
-  project = previewProjection,
+  initial = PURCHASING_POWER_DEFAULTS,
+  amountNote,
+  inflationNote,
 }: {
   initial?: PurchasingPowerInput;
-  project?: (i: PurchasingPowerInput) => PurchasingPowerPoint[];
+  /** Shown under the starting amount (e.g. "Your tracked value"). */
+  amountNote?: string;
+  /** Shown under the inflation rate (e.g. "Latest CPI, Sep 2026"). */
+  inflationNote?: string;
 }) {
   const [form, setForm] = useState<FormState>(() => toForm(initial));
   const input = parse(form);
-  const points = input ? project(input) : [];
-  const last = points[points.length - 1];
+  const key = input ? JSON.stringify(input) : null;
+  const [projection, setProjection] = useState<Projection | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!key) return;
+    const body = JSON.parse(key) as PurchasingPowerInput;
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      setLoadingKey(key);
+      try {
+        const result = unwrap(
+          await api.POST('/inflation/purchasing-power', { body, signal: ctrl.signal }),
+        );
+        setProjection({ input: body, result });
+        setError(null);
+      } catch (e) {
+        if (ctrl.signal.aborted) return;
+        setError(e instanceof ApiError ? e.message : 'Could not calculate the projection.');
+      } finally {
+        if (!ctrl.signal.aborted) setLoadingKey(null);
+      }
+    }, DEBOUNCE_MS);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [key]);
+
+  const stale = projection != null && key !== JSON.stringify(projection.input);
+  const loading = key != null && loadingKey === key;
+  const points = projection?.result.points ?? [];
+  const final = projection?.result.final;
+  const shownYears = projection?.input.years;
 
   const set = (k: keyof FormState) => (e: ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -97,7 +118,7 @@ export function PurchasingPowerCalculator({
           className="grid grid-cols-2 gap-4 lg:grid-cols-1"
           onSubmit={(e) => e.preventDefault()}
         >
-          <Field label="Starting amount ($)" className="col-span-2 lg:col-span-1">
+          <Field label="Starting amount ($)" hint={amountNote} className="col-span-2 lg:col-span-1">
             <TextInput inputMode="decimal" value={form.amount} onChange={set('amount')} />
           </Field>
           <Field label="Monthly contribution ($)" className="col-span-2 lg:col-span-1">
@@ -107,7 +128,7 @@ export function PurchasingPowerCalculator({
               onChange={set('monthlyContribution')}
             />
           </Field>
-          <Field label="Inflation (%/yr)">
+          <Field label="Inflation (%/yr)" hint={inflationNote}>
             <TextInput
               inputMode="decimal"
               value={form.inflationRate}
@@ -117,34 +138,60 @@ export function PurchasingPowerCalculator({
           <Field label="Growth (%/yr)">
             <TextInput inputMode="decimal" value={form.growthRate} onChange={set('growthRate')} />
           </Field>
-          <Field label="Years" hint="1 to 60" className="col-span-2 lg:col-span-1">
+          <Field label="Years" hint={`1 to ${MAX_YEARS}`} className="col-span-2 lg:col-span-1">
             <TextInput inputMode="numeric" value={form.years} onChange={set('years')} />
           </Field>
         </form>
 
-        <div className="min-w-0">
-          {input && last ? (
+        <div
+          className={cn('min-w-0 transition-opacity', stale || loading ? 'opacity-60' : null)}
+          aria-busy={loading}
+        >
+          {!input ? (
+            <p className="rounded-lg border border-dashed border-line-strong p-6 text-[13px] text-muted">
+              Enter numbers in every field, with years between 1 and {MAX_YEARS}, inflation between
+              −50% and 100%, and growth between −90% and 100%, to see the projection.
+            </p>
+          ) : error ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-dashed border-line-strong p-6 text-[13px] text-warn"
+            >
+              {error}
+            </p>
+          ) : !final ? (
+            <div className="h-[330px] animate-pulse rounded-lg bg-surface-2" aria-hidden />
+          ) : (
             <>
               <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div>
-                  <dt className="text-[13px] text-muted">In {input.years} years</dt>
+                  <dt className="text-[13px] text-muted">In {shownYears} years</dt>
                   <dd className="mt-0.5 text-[22px] font-semibold text-fg">
-                    {formatMoney(last.nominal)}
+                    {formatMoney(final.nominal)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-[13px] text-muted">In today&apos;s dollars</dt>
                   <dd className="mt-0.5 text-[22px] font-semibold text-up">
-                    {formatMoney(last.real)}
+                    {formatMoney(final.real)}
                   </dd>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <dt className="text-[13px] text-muted">Lost to inflation</dt>
                   <dd className="mt-0.5 text-[22px] font-semibold text-warn">
-                    {formatMoney(last.nominal - last.real)}
+                    {formatMoney(final.nominal - final.real)}
                   </dd>
                 </div>
               </dl>
+              {projection ? (
+                <p className="mt-3 text-[13px] text-muted">
+                  Left uninvested, {formatMoney(projection.input.amount)} would buy only what{' '}
+                  <span className="font-semibold text-fg">
+                    {formatMoney(projection.result.amountReal)}
+                  </span>{' '}
+                  buys today after {projection.input.years} years.
+                </p>
+              ) : null}
               <div
                 className="mt-5 h-[260px]"
                 role="img"
@@ -221,10 +268,6 @@ export function PurchasingPowerCalculator({
                 </ResponsiveContainer>
               </div>
             </>
-          ) : (
-            <p className="rounded-lg border border-dashed border-line-strong p-6 text-[13px] text-muted">
-              Enter numbers in every field, with years between 1 and 60, to see the projection.
-            </p>
           )}
         </div>
       </div>

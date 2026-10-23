@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { FeedbackForm } from '@/components/help/FeedbackForm';
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Card } from '@/components/ui/Card';
 
@@ -31,6 +32,18 @@ const FAQ: { q: string; a: string }[] = [
     a: 'Yes. On a portfolio’s holdings page, choose Import CSV and paste or upload an export from Fidelity, Schwab, Vanguard or a generic ticker/shares file.',
   },
   {
+    q: 'What does the What-if simulator do?',
+    a: 'Pick a fund or stock and an amount, and EasyFI shows how your sectors, overlap with funds you already hold and diversification score would change. Nothing is saved or traded. Open it from any portfolio page.',
+  },
+  {
+    q: 'What do people see on a share link?',
+    a: 'A read-only snapshot: sector weights, top company exposures, fund weights and the diversification score. No share counts, dollar values or account details. Revoke a link any time in Settings.',
+  },
+  {
+    q: 'How is my FI number worked out?',
+    a: 'Annual expenses divided by your withdrawal rate (25× expenses at 4%). Progress compares it with the value of every portfolio you track; the projection grows that value with your monthly contribution and expected return, in today’s dollars.',
+  },
+  {
     q: 'Is this investment advice?',
     a: 'No. EasyFI is an educational research tool. It shows what you own; it does not tell you what to buy or sell.',
   },
@@ -43,8 +56,8 @@ export default function HelpPage() {
         title="Help"
         subtitle="Answers to common questions about how EasyFI reads your portfolio."
       />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <Card padded={false} className="divide-y divide-line">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Card padded={false} className="h-fit divide-y divide-line">
           {FAQ.map((f) => (
             <details key={f.q} className="group px-5 py-4 sm:px-6">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[14px] font-medium text-fg">
@@ -57,19 +70,30 @@ export default function HelpPage() {
             </details>
           ))}
         </Card>
-        <Card as="aside" className="h-fit">
-          <h2 className="text-[15px] font-semibold text-fg">Still stuck?</h2>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-            Ask the Investment Explorer a question in plain English, or message the person who
-            invited you.
-          </p>
-          <Link
-            href="/explorer"
-            className="mt-4 inline-block text-[13px] font-medium text-up hover:underline"
-          >
-            Open Investment Explorer
-          </Link>
-        </Card>
+        <aside className="space-y-5">
+          <Card>
+            <h2 className="text-[15px] font-semibold text-fg">Still stuck?</h2>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+              Ask the Investment Explorer a question in plain English, or message the person who
+              invited you.
+            </p>
+            <Link
+              href="/explorer"
+              className="mt-4 inline-block text-[13px] font-medium text-up hover:underline"
+            >
+              Open Investment Explorer
+            </Link>
+          </Card>
+          <Card aria-labelledby="h-feedback">
+            <h2 id="h-feedback" className="text-[15px] font-semibold text-fg">
+              Send feedback
+            </h2>
+            <p className="mt-1.5 mb-4 text-[13px] leading-relaxed text-muted">
+              Found a bug or a number that looks wrong? A screenshot helps.
+            </p>
+            <FeedbackForm />
+          </Card>
+        </aside>
       </div>
     </>
   );

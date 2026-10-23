@@ -83,8 +83,9 @@ function topSlices(
   n = MAX_SLICES,
 ): AllocationSlice[] {
   const sorted = [...groups].filter((g) => g.weight > 0).sort((a, b) => b.weight - a.weight);
-  const shown = sorted.filter((g) => g.key !== UNRESOLVED_KEY).slice(0, n);
   const unresolved = sorted.find((g) => g.key === UNRESOLVED_KEY);
+  // keep the legend at n + 1 rows: the unresolved slice takes one of the named slots
+  const shown = sorted.filter((g) => g.key !== UNRESOLVED_KEY).slice(0, unresolved ? n - 1 : n);
   const used = shown.reduce((s, g) => s + g.weight, 0) + (unresolved?.weight ?? 0);
   const rest = sorted.filter((g) => !shown.includes(g) && g !== unresolved);
   const slices: AllocationSlice[] = shown.map((g) => ({

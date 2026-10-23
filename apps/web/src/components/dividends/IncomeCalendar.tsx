@@ -24,14 +24,25 @@ function niceMax(v: number) {
 const HATCH =
   'repeating-linear-gradient(135deg, color-mix(in srgb, var(--c1) 38%, transparent) 0 4px, color-mix(in srgb, var(--c1) 14%, transparent) 4px 8px)';
 
-/** Monthly income bars (received solid, projected hatched). Click a month for its payments. */
+/**
+ * Monthly income bars (received solid, expected — announced or projected — hatched, stacked when a
+ * month has both). Click a month for its payments.
+ */
 export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
-  const lastReceived = [...months].reverse().find((m) => m.received != null)?.month;
-  const [selected, setSelected] = useState(initialMonth ?? lastReceived ?? months[0]?.month ?? '');
-  const amount = (m: IncomeMonth) => m.received ?? m.projected ?? 0;
+  const hasReceived = (m: IncomeMonth) =>
+    (m.received ?? 0) > 0 || m.payments.some((p) => p.status === 'received');
+  let lastReceivedIdx = -1;
+  months.forEach((m, i) => {
+    if (hasReceived(m)) lastReceivedIdx = i;
+  });
+  // Months after the last one with received income are the forward-looking part.
+  const firstProjected = lastReceivedIdx + 1;
+  const [selected, setSelected] = useState(
+    initialMonth ?? months[lastReceivedIdx]?.month ?? months[0]?.month ?? '',
+  );
+  const amount = (m: IncomeMonth) => (m.received ?? 0) + (m.projected ?? 0);
   const max = niceMax(Math.max(...months.map(amount), 0) * 1.08);
   const ticks = [1, 0.5, 0];
-  const firstProjected = months.findIndex((m) => m.received == null && m.projected != null);
   const current = months.find((m) => m.month === selected);
   const receivedTotal = months.reduce((s, m) => s + (m.received ?? 0), 0);
   const projectedTotal = months.reduce((s, m) => s + (m.projected ?? 0), 0);
@@ -42,7 +53,7 @@ export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
         <div>
           <h2 className="text-[15px] font-semibold text-fg">Income calendar</h2>
           <p className="mt-1 text-[13px] text-muted">
-            {formatMoney(receivedTotal)} received · {formatMoney(projectedTotal)} projected
+            {formatMoney(receivedTotal)} received · {formatMoney(projectedTotal)} expected
           </p>
         </div>
         <ul className="flex items-center gap-4 text-[12px] text-muted" aria-label="Legend">
@@ -55,7 +66,7 @@ export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
               className="h-2.5 w-2.5 rounded-[3px] border border-dashed border-c1"
               style={{ background: HATCH }}
             />
-            Projected
+            Expected
           </li>
         </ul>
       </div>
@@ -86,14 +97,14 @@ export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
                 style={{ top: `${(1 - t) * 100}%` }}
               />
             ))}
-            {firstProjected > 0 ? (
+            {firstProjected > 0 && firstProjected < months.length ? (
               <div
                 aria-hidden
                 className="absolute inset-y-0 border-l border-dashed border-line-strong"
                 style={{ left: `${(firstProjected / months.length) * 100}%` }}
               >
                 <span className="absolute -top-5 left-1.5 text-[11px] whitespace-nowrap text-faint">
-                  Projected
+                  Expected
                 </span>
               </div>
             ) : null}
@@ -103,32 +114,51 @@ export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
               className="absolute inset-0 flex items-end gap-[3px] sm:gap-1.5"
             >
               {months.map((m) => {
-                const v = amount(m);
-                const projected = m.received == null;
+                const rec = m.received ?? 0;
+                const exp = m.projected ?? 0;
+                const v = rec + exp;
                 const isSel = m.month === selected;
+                const unknown = m.received == null && m.projected == null;
+                const desc = unknown
+                  ? 'amount unknown'
+                  : [
+                      rec > 0 ? `${formatMoney(rec)} received` : null,
+                      exp > 0 ? `${formatMoney(exp)} expected` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(', ') || 'no distributions';
                 return (
                   <button
                     key={m.month}
                     type="button"
                     role="option"
                     aria-selected={isSel}
-                    aria-label={`${formatMonth(m.month, true)}: ${formatMoney(v)} ${projected ? 'projected' : 'received'}`}
+                    aria-label={`${formatMonth(m.month, true)}: ${desc}`}
                     onClick={() => setSelected(m.month)}
                     className="group relative flex h-full flex-1 items-end justify-center rounded-md focus-visible:outline-offset-0"
                   >
                     <span
                       className={cn(
-                        'block w-full max-w-[34px] rounded-t-[5px] rounded-b-[2px] transition-[opacity,box-shadow]',
-                        projected ? 'border border-b-0 border-dashed border-c1' : 'bg-c1',
+                        'flex w-full max-w-[34px] flex-col-reverse overflow-hidden rounded-t-[5px] rounded-b-[2px] transition-[opacity,box-shadow]',
                         isSel
                           ? 'opacity-100 shadow-[0_0_0_2px_var(--surface),0_0_0_3.5px_var(--fg)]'
                           : 'opacity-75 group-hover:opacity-100',
                       )}
-                      style={{
-                        height: `${Math.max(v > 0 ? 2 : 0, (v / max) * 100)}%`,
-                        ...(projected ? { background: HATCH } : null),
-                      }}
-                    />
+                      style={{ height: `${Math.max(v > 0 ? 2 : 0, (v / max) * 100)}%` }}
+                    >
+                      {rec > 0 ? (
+                        <span className="block w-full bg-c1" style={{ flexGrow: rec }} />
+                      ) : null}
+                      {exp > 0 ? (
+                        <span
+                          className={cn(
+                            'block w-full border border-dashed border-c1',
+                            rec > 0 ? 'border-b-0' : 'rounded-t-[5px] border-b-0',
+                          )}
+                          style={{ flexGrow: exp, background: HATCH }}
+                        />
+                      ) : null}
+                    </span>
                   </button>
                 );
               })}
@@ -169,9 +199,18 @@ export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
               {formatMonth(current.month, true)}
             </h3>
             <span className="text-[13px] text-muted">
-              {current.received != null
-                ? `${formatMoney(current.received)} received`
-                : `${formatMoney(current.projected)} projected`}
+              {current.received == null && current.projected == null
+                ? `${MISSING} amount unknown`
+                : [
+                    (current.received ?? 0) > 0 || (current.projected ?? 0) === 0
+                      ? `${formatMoney(current.received)} received`
+                      : null,
+                    (current.projected ?? 0) > 0
+                      ? `${formatMoney(current.projected)} expected`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
             </span>
           </div>
           {current.payments.length === 0 ? (
@@ -181,7 +220,7 @@ export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
               {current.payments.map((p) => (
                 <li
                   key={p.id}
-                  className="grid grid-cols-[56px_1fr_auto] items-center gap-x-3 gap-y-0.5 py-2.5 text-[13px] sm:grid-cols-[64px_1fr_72px_96px_112px_72px]"
+                  className="grid grid-cols-[56px_1fr_auto] items-center gap-x-3 gap-y-0.5 py-2.5 text-[13px] sm:grid-cols-[64px_1fr_72px_96px_112px_80px_72px]"
                 >
                   <span className="font-mono font-bold text-fg">{p.ticker}</span>
                   <span className="truncate text-muted">{p.name}</span>
@@ -200,6 +239,16 @@ export function IncomeCalendar({ months, initialMonth }: IncomeCalendarProps) {
                     <Pill tone="neutral" className="h-5 px-2 text-[11px] font-medium">
                       {ACCOUNT_LABEL[p.account]}
                     </Pill>
+                  </span>
+                  <span className="hidden sm:block">
+                    {p.status === 'received' ? null : (
+                      <Pill
+                        tone={p.status === 'announced' ? 'info' : 'neutral'}
+                        className="h-5 px-2 text-[11px] font-medium"
+                      >
+                        {p.status === 'announced' ? 'Announced' : 'Estimated'}
+                      </Pill>
+                    )}
                   </span>
                 </li>
               ))}

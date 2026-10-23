@@ -1,15 +1,16 @@
 'use client';
 
-import { Menu, X } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { api } from '@/lib/api/client';
 import { cn } from '@/lib/cn';
 import { Logo } from './Logo';
 import { isActive, type NavItem, PRIMARY_NAV, SECONDARY_NAV } from './nav';
 
-export type ShellUser = { displayName: string; email: string };
+export type ShellUser = { displayName: string; email: string | null };
 
 function NavLink({
   item,
@@ -65,7 +66,12 @@ function UserChip({ user, rail }: { user: ShellUser; rail?: boolean }) {
     .join('')
     .slice(0, 2);
   return (
-    <div className={cn('flex items-center gap-2.5', rail && 'justify-center lg:justify-start')}>
+    <div
+      className={cn(
+        'flex min-w-0 items-center gap-2.5',
+        rail && 'justify-center lg:flex-1 lg:justify-start',
+      )}
+    >
       <span
         aria-hidden
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[12px] font-semibold text-fg"
@@ -74,9 +80,34 @@ function UserChip({ user, rail }: { user: ShellUser; rail?: boolean }) {
       </span>
       <span className={cn('min-w-0', rail && 'hidden lg:block')}>
         <span className="block truncate text-[13px] font-medium text-fg">{user.displayName}</span>
-        <span className="block truncate text-[11px] text-faint">{user.email}</span>
+        {user.email ? (
+          <span className="block truncate text-[11px] text-faint">{user.email}</span>
+        ) : null}
       </span>
+      <SignOutButton className={cn(rail && 'hidden lg:inline-flex')} />
     </div>
+  );
+}
+
+function SignOutButton({ className }: { className?: string }) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      aria-label="Sign out"
+      title="Sign out"
+      onClick={async () => {
+        await api.POST('/auth/sign-out');
+        router.replace('/sign-in');
+        router.refresh();
+      }}
+      className={cn(
+        'ml-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-surface-2 hover:text-fg',
+        className,
+      )}
+    >
+      <LogOut aria-hidden className="h-4 w-4" />
+    </button>
   );
 }
 

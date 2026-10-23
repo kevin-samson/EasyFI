@@ -33,7 +33,7 @@ import {
   summary,
   type PortfolioInput,
 } from './internal/analysis';
-import { toCoreHolding } from './internal/mappers';
+import { sectorLabel, toCoreHolding } from './internal/mappers';
 import { loadMarket } from './internal/market';
 
 export const ALL = 'all';
@@ -184,7 +184,7 @@ export function portfolioService(ctx: Ctx) {
             key: n.ticker!,
             ticker: n.ticker!,
             name: n.label,
-            sector: n.sector,
+            sector: n.sector ? sectorLabel(n.sector) : null,
             concentration: n.concentration ?? 'low',
             weight: n.weight,
             value: n.value,

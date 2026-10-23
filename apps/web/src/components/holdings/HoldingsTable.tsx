@@ -20,10 +20,12 @@ export type HoldingsTableProps = {
   asOf: string | null;
   /** File name stem for the CSV export. */
   exportName?: string;
-  /** Called after the user confirms bulk delete (mock: rows are removed locally). */
+  /** Persist a bulk delete (rows are removed optimistically). */
   onDelete?: (ids: string[]) => void;
-  /** Called after bulk tagging (mock: tags are applied locally). */
+  /** Persist bulk tagging (tags are applied optimistically). */
   onTag?: (ids: string[], tag: string) => void;
+  /** Open the editor for one line. */
+  onEdit?: (row: HoldingRow) => void;
   className?: string;
 };
 
@@ -51,7 +53,15 @@ const VIEW_LABEL: Record<HoldingsView, string> = {
 
 const tickerSort = (r: HoldingRow) => r.ticker;
 
-const TYPE_ORDER: HoldingType[] = ['etf', 'mutual_fund', 'stock', 'cash', 'bond', 'crypto'];
+const TYPE_ORDER: HoldingType[] = [
+  'etf',
+  'mutual_fund',
+  'stock',
+  'cash',
+  'bond',
+  'crypto',
+  'other',
+];
 
 const weight = (r: HoldingRow, c: Ctx) => (r.value == null || !c.total ? null : r.value / c.total);
 const gain = (r: HoldingRow) =>
@@ -267,9 +277,16 @@ export function HoldingsTable({
   exportName = 'holdings',
   onDelete,
   onTag,
+  onEdit,
   className,
 }: HoldingsTableProps) {
   const [rows, setRows] = useState<HoldingRow[]>(holdings);
+  // re-sync when the server sends fresh rows (after add / import / edit)
+  const [source, setSource] = useState(holdings);
+  if (source !== holdings) {
+    setSource(holdings);
+    setRows(holdings);
+  }
   const [view, setView] = useState<HoldingsView>('overview');
   const [types, setTypes] = useState<Set<HoldingType>>(new Set());
   const [tagFilter, setTagFilter] = useState<string | null>(null);
@@ -622,7 +639,18 @@ export function HoldingsTable({
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[13px] font-bold text-fg">{r.ticker}</span>
+                      {onEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(r)}
+                          title={`Edit ${r.ticker}`}
+                          className="font-mono text-[13px] font-bold text-fg hover:underline hover:underline-offset-4"
+                        >
+                          {r.ticker}
+                        </button>
+                      ) : (
+                        <span className="font-mono text-[13px] font-bold text-fg">{r.ticker}</span>
+                      )}
                       {r.price == null ? (
                         <Pill tone="neutral" className="h-5 px-2 text-[11px]">
                           Unpriced

@@ -85,8 +85,8 @@ export function toFundHoldingsMap(snaps: Record<string, FundSnapshot>): FundHold
 const SECTOR_LABELS: Record<string, string> = {
   'Information Technology': 'Technology',
   'Communication Services': 'Communication',
-  'Consumer Discretionary': 'Consumer Disc.',
-  'Consumer Staples': 'Consumer Staples',
+  'Consumer Discretionary': 'Consumer',
+  'Consumer Staples': 'Staples',
   'Health Care': 'Health Care',
 };
 

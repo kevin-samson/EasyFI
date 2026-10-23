@@ -1,3 +1,4 @@
+import { AsOf } from '@/components/ui/AsOf';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { cn } from '@/lib/cn';
 import { formatPercent } from '@/lib/format';
@@ -7,12 +8,25 @@ import type { CpiCategory } from './types';
  * Category drivers: diverging bars around zero (rising prices right, falling left),
  * sorted by year-over-year change.
  */
-export function CpiDriversCard({ categories }: { categories: CpiCategory[] }) {
+export function CpiDriversCard({
+  categories,
+  asOf,
+}: {
+  categories: CpiCategory[];
+  asOf?: string | null;
+}) {
   const sorted = [...categories].sort((a, b) => (b.yoy ?? 0) - (a.yoy ?? 0));
   const maxAbs = Math.max(...sorted.map((c) => Math.abs(c.yoy ?? 0)), 0.0001);
   return (
     <Card>
-      <CardHeader title="What is moving prices" meta="12-month change by category" />
+      <CardHeader
+        title="What is moving prices"
+        meta="12-month change by category"
+        actions={asOf !== undefined ? <AsOf date={asOf} prefix="released" /> : undefined}
+      />
+      {sorted.length === 0 ? (
+        <p className="mt-5 text-[13px] text-muted">Category data is not available yet.</p>
+      ) : null}
       <ul className="mt-5 space-y-3.5">
         {sorted.map((c) => {
           const v = c.yoy ?? 0;

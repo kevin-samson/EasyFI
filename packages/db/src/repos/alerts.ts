@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 import type { Db } from '../client';
-import { alerts, type Alert } from '../schema';
+import { alerts, profiles, type Alert } from '../schema';
 import { isUuid } from '../util';
 
 export interface AlertInput {
@@ -41,6 +41,14 @@ export function alertsRepo(db: Db) {
     },
     markFired(userId: string, id: string, at: Date = new Date()): Promise<Alert | null> {
       return patchOwned(userId, id, { lastFiredAt: at });
+    },
+    /** Job-only (crosses users): ids + emails of users with at least one enabled alert. */
+    async usersWithEnabled(): Promise<{ userId: string; email: string | null }[]> {
+      return db
+        .selectDistinct({ userId: alerts.userId, email: profiles.email })
+        .from(alerts)
+        .leftJoin(profiles, eq(profiles.id, alerts.userId))
+        .where(eq(alerts.enabled, true));
     },
     async delete(userId: string, id: string): Promise<boolean> {
       if (!isUuid(id)) return false;

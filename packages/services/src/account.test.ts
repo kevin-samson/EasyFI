@@ -232,6 +232,12 @@ describe('explorer', () => {
     expect(events.map((e) => e.type)).toContain('tool');
     expect(events.at(-1)!.type).toBe('done');
     expect(msg.blocks[0]).toMatchObject({ type: 'table' });
+    expect(msg.text).toMatch(/^VOO and QQQ overlap \d+% by weight, sharing \d+ holdings/);
+    // an unused thread is hidden from the list
+    await t.services.explorer.create(t.userId);
+    expect((await t.services.explorer.list(t.userId)).threads.map((x) => x.title)).toEqual([
+      'Compare VOO and QQQ',
+    ]);
     const thread = ExplorerThread.parse(await t.services.explorer.get(t.userId, th.id));
     expect(thread.title).toBe('Compare VOO and QQQ');
     expect(thread.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
@@ -264,5 +270,6 @@ describe('explorer', () => {
     await expect(s.explorer.ask(OTHER_USER_ID, th.id, 'again')).rejects.toMatchObject({
       code: 'rate_limited',
     });
+    expect((await s.explorer.list(OTHER_USER_ID)).usage.usedToday).toBe(1);
   });
 });

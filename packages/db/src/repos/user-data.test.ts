@@ -160,6 +160,9 @@ describe('alerts, goals, share links, feedback', () => {
     expect(await r.alerts.list(B)).toEqual([]);
     expect(await r.alerts.update(B, a.id, { enabled: false })).toBeNull();
     expect(await r.alerts.update(A, a.id, { enabled: false })).toMatchObject({ enabled: false });
+    expect(await r.alerts.usersWithEnabled()).toEqual([]);
+    await r.alerts.update(A, a.id, { enabled: true });
+    expect((await r.alerts.usersWithEnabled()).map((u) => u.userId)).toEqual([A]);
     const fired = new Date('2026-10-22T00:00:00Z');
     expect((await r.alerts.markFired(A, a.id, fired))!.lastFiredAt).toEqual(fired);
     expect(await r.alerts.delete(B, a.id)).toBe(false);

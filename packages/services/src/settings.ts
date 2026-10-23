@@ -196,8 +196,10 @@ export function settingsService(ctx: Ctx) {
       return toAlert(row!);
     },
     /** Evaluates enabled rules; marks fired ones. Delivery (email) is the caller's job. */
-    async checkAlerts(userId: string): Promise<AlertCheck> {
-      const rules = (await ctx.repos.alerts.list(userId)).map(toAlert).filter((a) => a.enabled);
+    async checkAlerts(userId: string, opts: { since?: Date } = {}): Promise<AlertCheck> {
+      const rules = (await ctx.repos.alerts.list(userId))
+        .filter((a) => a.enabled && !(opts.since && a.lastFiredAt && a.lastFiredAt >= opts.since))
+        .map(toAlert);
       if (!rules.length) return { triggered: [] };
       const ps = await loadPortfolios(ctx, userId);
       const market = await loadMarket(ctx.repos, tickersOf(ps));

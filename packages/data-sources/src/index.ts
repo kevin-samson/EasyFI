@@ -19,6 +19,7 @@ export * from './http';
 export * from './tiingo';
 export * from './bls';
 export * from './openrouter';
+export * from './email';
 export * from './sec/edgar';
 export * from './sec/nport';
 export * from './fakes/prices';

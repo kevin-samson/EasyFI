@@ -4,8 +4,8 @@ import { PortfolioCreateForm } from '@/components/portfolios/PortfolioCreateForm
 import { PageHeader } from '@/components/shell/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { formatMoney } from '@/lib/format';
+import { load, serverApi } from '@/lib/api/server';
 import { cn } from '@/lib/cn';
-import { portfolios } from '@/mocks/portfolios';
 
 export const metadata: Metadata = { title: 'Portfolios' };
 
@@ -16,16 +16,17 @@ export default async function PortfoliosPage({
 }) {
   const { new: isNew } = await searchParams;
   const highlight = isNew === '1';
-  const total = portfolios.reduce((s, p) => s + (p.totalValue ?? 0), 0);
+  const api = await serverApi();
+  const { portfolios, totalValue: total } = await load(api.GET('/portfolios'));
   const sorted = [...portfolios].sort(
-    (a, b) => (a.diversificationScore ?? 0) - (b.diversificationScore ?? 0),
+    (a, b) => (a.diversificationScore ?? 101) - (b.diversificationScore ?? 101),
   );
 
   return (
     <>
       <PageHeader
         title="Portfolios"
-        subtitle={`${portfolios.length} portfolios · ${formatMoney(total)} tracked · riskiest first`}
+        subtitle={`${portfolios.length} portfolio${portfolios.length === 1 ? '' : 's'} · ${formatMoney(total)} tracked · riskiest first`}
       />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section aria-label="Your portfolios" className="grid content-start gap-5 md:grid-cols-2">

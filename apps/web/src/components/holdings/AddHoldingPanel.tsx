@@ -1,28 +1,33 @@
 'use client';
 
 import { Search } from 'lucide-react';
-import { type FormEvent, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Field, Select, TextInput, inputClass } from '@/components/ui/Field';
 import { SegmentedTabs } from '@/components/ui/SegmentedTabs';
+import { api, ApiError, unwrap } from '@/lib/api/client';
 import { cn } from '@/lib/cn';
 import { Overlay } from './Overlay';
 import {
   ACCOUNT_TYPE_LABEL,
   type AccountType,
-  type AddHoldingInput,
   HOLDING_TYPE_LABEL,
+  type HoldingRow,
+  type HoldingType,
   type TickerSuggestion,
 } from './types';
 
 export type AddHoldingPanelProps = {
   open: boolean;
   onClose: () => void;
-  /** Ticker lookup results (mock list until GET /api/v1/securities?q= exists). */
-  suggestions: TickerSuggestion[];
-  /** Persist the new line. Not wired yet. */
-  action?: (data: AddHoldingInput) => void | Promise<void>;
+  portfolioId: string;
+  /** Line being edited; null/undefined = add a new one. */
+  editing?: HoldingRow | null;
+  /** Called after a successful save (refresh the table). */
+  onSaved: () => void;
 };
+
+type Mode = 'shares' | 'dollars' | 'statement';
 
 /** Parses paste-friendly numbers: "$1,234.50" → 1234.5. Empty → null. */
 function parseAmount(s: string): number | null {
@@ -30,49 +35,165 @@ function parseAmount(s: string): number | null {
   return s.trim() === '' || !Number.isFinite(n) ? null : n;
 }
 
+const SECURITY_TYPE: Record<string, HoldingType> = {
+  etf: 'etf',
+  mutual_fund: 'mutual_fund',
+  stock: 'stock',
+  mmf: 'cash',
+  bond: 'bond',
+  crypto: 'crypto',
+  other: 'other',
+};
+
 const EMPTY = { ticker: '', amount: '', cost: '', tags: '' };
 
-/** Side drawer to add one holding (ticker search, account, shares/dollars, cost basis, tags). */
-export function AddHoldingPanel({ open, onClose, suggestions, action }: AddHoldingPanelProps) {
+/** Live ticker lookup against /api/v1/securities/search (debounced). */
+function useTickerSearch(q: string) {
+  const [results, setResults] = useState<TickerSuggestion[]>([]);
+  useEffect(() => {
+    const term = q.trim();
+    if (!term) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const r = await api.GET('/securities/search', { params: { query: { q: term, limit: 6 } } });
+      if (!cancelled && r.data) {
+        setResults(
+          r.data.results.map((s) => ({
+            ticker: s.ticker,
+            name: s.name,
+            type: SECURITY_TYPE[s.type] ?? 'other',
+          })),
+        );
+      }
+    }, 180);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q]);
+  return q.trim() ? results : [];
+}
+
+/** Side drawer to add or edit one holding (ticker search, account, amount, cost basis, tags). */
+export function AddHoldingPanel({
+  open,
+  onClose,
+  portfolioId,
+  editing,
+  onSaved,
+}: AddHoldingPanelProps) {
   const tickerRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState(EMPTY);
   const [account, setAccount] = useState<AccountType>('taxable');
-  const [mode, setMode] = useState<'shares' | 'dollars'>('shares');
+  const [mode, setMode] = useState<Mode>('shares');
   const [showList, setShowList] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const matches = useTickerSearch(showList ? form.ticker : '');
 
-  const q = form.ticker.trim().toLowerCase();
-  const matches = q
-    ? suggestions
-        .filter((s) => s.ticker.toLowerCase().startsWith(q) || s.name.toLowerCase().includes(q))
-        .slice(0, 6)
-    : [];
+  // load the edited line into the form whenever the panel opens for it
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const key = open ? (editing?.id ?? 'new') : null;
+  if (key !== loadedFor) {
+    setLoadedFor(key);
+    setError(null);
+    setAdded(null);
+    if (editing) {
+      const statement = editing.shares == null;
+      setForm({
+        ticker: editing.ticker,
+        amount: statement ? String(editing.value ?? '') : String(editing.shares ?? ''),
+        cost: editing.costBasis == null ? '' : String(editing.costBasis),
+        tags: editing.tags.join(', '),
+      });
+      setAccount(editing.accountType);
+      setMode(statement ? 'statement' : 'shares');
+    } else if (key === 'new') {
+      setForm(EMPTY);
+      setMode('shares');
+    }
+  }
 
   const submit = async (another: boolean, e?: FormEvent) => {
     e?.preventDefault();
-    if (!form.ticker.trim()) {
+    const ticker = form.ticker.trim().toUpperCase();
+    if (!ticker) {
       tickerRef.current?.focus();
       return;
     }
-    await action?.({
-      ticker: form.ticker.trim().toUpperCase(),
-      accountType: account,
-      mode,
-      amount: parseAmount(form.amount),
-      costBasis: parseAmount(form.cost),
-      tags: form.tags
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean),
-    });
-    if (another) {
-      setAdded(form.ticker.trim().toUpperCase());
-      setForm(EMPTY);
-      tickerRef.current?.focus();
-    } else {
-      setForm(EMPTY);
-      setAdded(null);
+    const amount = parseAmount(form.amount);
+    if (amount == null || amount <= 0) {
+      setError(mode === 'shares' ? 'Enter the number of shares.' : 'Enter an amount.');
+      return;
+    }
+    const costBasis = parseAmount(form.cost);
+    const tags = form.tags
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    setBusy(true);
+    setError(null);
+    try {
+      if (editing) {
+        unwrap(
+          await api.PATCH('/holdings/{id}', {
+            params: { path: { id: editing.id } },
+            body: {
+              ticker,
+              accountType: account,
+              tags,
+              costBasis,
+              ...(mode === 'statement'
+                ? { shares: null, statementValue: amount }
+                : { shares: amount, statementValue: null }),
+            },
+          }),
+        );
+      } else {
+        unwrap(
+          await api.POST('/portfolios/{id}/holdings', {
+            params: { path: { id: portfolioId } },
+            body: {
+              ticker,
+              accountType: account,
+              tags,
+              costBasis,
+              ...(mode === 'shares'
+                ? { shares: amount }
+                : mode === 'dollars'
+                  ? { dollars: amount }
+                  : { statementValue: amount }),
+            },
+          }),
+        );
+      }
+      onSaved();
+      if (another && !editing) {
+        setAdded(ticker);
+        setForm(EMPTY);
+        tickerRef.current?.focus();
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not save the holding.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      unwrap(await api.DELETE('/holdings/{id}', { params: { path: { id: editing.id } } }));
+      onSaved();
       onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not remove the holding.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -81,24 +202,43 @@ export function AddHoldingPanel({ open, onClose, suggestions, action }: AddHoldi
       open={open}
       onClose={onClose}
       variant="drawer"
-      title="Add holding"
-      description="Search by ticker, CUSIP or name. Unpriced assets can be added by statement value."
+      title={editing ? `Edit ${editing.ticker}` : 'Add holding'}
+      description="Search by ticker or name. Assets without a market price can be added by statement value."
       initialFocus={tickerRef}
       footer={
-        <>
-          <Button variant="ghost" onClick={() => void submit(true)}>
-            Add and add another
-          </Button>
-          <Button variant="primary" type="submit" form="add-holding-form">
-            Add
-          </Button>
-        </>
+        editing ? (
+          <>
+            <Button variant="danger" onClick={() => void remove()} disabled={busy}>
+              Remove
+            </Button>
+            <Button variant="primary" type="submit" form="add-holding-form" disabled={busy}>
+              Save
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={() => void submit(true)} disabled={busy}>
+              Add and add another
+            </Button>
+            <Button variant="primary" type="submit" form="add-holding-form" disabled={busy}>
+              Add
+            </Button>
+          </>
+        )
       }
     >
       <form id="add-holding-form" onSubmit={(e) => void submit(false, e)} className="space-y-5">
         {added ? (
           <p role="status" className="rounded-lg bg-brand/10 px-3 py-2 text-[13px] text-brand">
             Added {added}. Enter the next holding.
+          </p>
+        ) : null}
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-lg bg-[var(--sev-high-bg)] px-3 py-2 text-[13px] text-[var(--sev-high-fg)]"
+          >
+            {error}
           </p>
         ) : null}
         <div className="relative">
@@ -174,13 +314,17 @@ export function AddHoldingPanel({ open, onClose, suggestions, action }: AddHoldi
             onChange={setMode}
             options={[
               { value: 'shares', label: 'Shares' },
-              { value: 'dollars', label: 'Dollars' },
+              ...(editing ? [] : [{ value: 'dollars' as const, label: 'Dollars' }]),
+              { value: 'statement', label: 'Statement value' },
             ]}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label={mode === 'shares' ? 'Shares' : 'Amount ($)'}>
+          <Field
+            label={mode === 'shares' ? 'Shares' : mode === 'dollars' ? 'Amount ($)' : 'Value ($)'}
+            hint={mode === 'statement' ? 'From your latest statement' : undefined}
+          >
             <TextInput
               inputMode="decimal"
               value={form.amount}

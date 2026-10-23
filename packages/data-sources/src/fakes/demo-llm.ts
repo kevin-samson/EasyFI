@@ -197,6 +197,15 @@ export class RuleBasedDemoLLM implements LLMProvider {
       try {
         const parsed = JSON.parse(t.content) as unknown;
         findAsOf(parsed, asOf);
+        // Tools may supply a ready-made sentence built from their own numbers; prefer it.
+        const summary =
+          parsed && typeof parsed === 'object' && 'summary' in parsed
+            ? (parsed as { summary: unknown }).summary
+            : null;
+        if (typeof summary === 'string' && summary) {
+          sections.push(summary);
+          continue;
+        }
         lines = summarizeResult(parsed);
       } catch {
         lines = [`${name} returned no usable data.`];
@@ -211,7 +220,7 @@ export class RuleBasedDemoLLM implements LLMProvider {
       .join(' ');
     return {
       role: 'assistant',
-      content: `Here's what the data shows:\n\n${sections.join('\n\n')}\n\n${footer}`,
+      content: `${sections.join('\n\n')}\n\n${footer}`,
     };
   }
 }

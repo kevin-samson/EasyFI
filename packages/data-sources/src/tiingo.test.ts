@@ -115,3 +115,20 @@ describe('TiingoClient.latest', () => {
     expect(await c.latest([])).toEqual({});
   });
 });
+
+describe('TiingoClient.eodWithDividends', () => {
+  it('returns prices and dividends from a single request', async () => {
+    const rows = [
+      { date: '2026-09-24T00:00:00.000Z', close: 600, divCash: 0 },
+      { date: '2026-09-25T00:00:00.000Z', close: 601, divCash: 1.75 },
+    ];
+    const fetch = fakeFetch(() => jsonResponse(rows));
+    const c = new TiingoClient({ token: 't', fetch, sleep: noSleep });
+    const out = await c.eodWithDividends('VOO', '2026-09-24', '2026-09-25');
+    expect(fetch.calls).toHaveLength(1);
+    expect(out.prices).toHaveLength(2);
+    expect(out.dividends).toEqual([
+      { ticker: 'VOO', exDate: '2026-09-25', payDate: null, amount: 1.75 },
+    ]);
+  });
+});

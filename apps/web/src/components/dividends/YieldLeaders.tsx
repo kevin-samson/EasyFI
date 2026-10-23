@@ -1,3 +1,4 @@
+import { AsOf } from '@/components/ui/AsOf';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { formatPercent } from '@/lib/format';
 import { FREQUENCY_LABEL, type YieldLeader } from './types';
@@ -6,7 +7,10 @@ import { FREQUENCY_LABEL, type YieldLeader } from './types';
 export function YieldLeaders({ leaders, asOf }: { leaders: YieldLeader[]; asOf?: string | null }) {
   return (
     <Card className="flex flex-col">
-      <CardHeader title="Yield leaders" meta={asOf ? `trailing, as of ${asOf}` : undefined} />
+      <CardHeader title="Yield leaders" meta="trailing 12 months" />
+      {leaders.length === 0 ? (
+        <p className="mt-4 text-[13px] text-muted">No dividend payers in this view.</p>
+      ) : null}
       <ul className="mt-4 divide-y divide-line">
         {leaders.map((l) => (
           <li key={l.ticker} className="flex items-center gap-3 py-3">
@@ -21,6 +25,9 @@ export function YieldLeaders({ leaders, asOf }: { leaders: YieldLeader[]; asOf?:
           </li>
         ))}
       </ul>
+      <div className="mt-auto pt-3">
+        <AsOf date={asOf} />
+      </div>
     </Card>
   );
 }

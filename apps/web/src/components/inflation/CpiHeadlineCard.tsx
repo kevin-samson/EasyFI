@@ -12,7 +12,7 @@ export function CpiHeadlineCard({ cpi }: { cpi: CpiSnapshot }) {
     <Card className="flex flex-col">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[13px] font-medium text-muted">
-          Consumer prices, {formatMonth(cpi.period, true)}
+          Consumer prices, {cpi.period ? formatMonth(cpi.period, true) : 'latest'}
         </h2>
         <AsOf date={cpi.asOf} prefix="released" />
       </div>
@@ -36,20 +36,22 @@ export function CpiHeadlineCard({ cpi }: { cpi: CpiSnapshot }) {
           <dd className="mt-0.5 text-[17px] font-semibold text-fg">{formatPercent(cpi.coreYoy)}</dd>
         </div>
       </dl>
-      <div className="mt-auto pt-6">
-        <Sparkline
-          values={cpi.history.map((h) => h.yoy)}
-          height={120}
-          color="var(--c4)"
-          label="Annual CPI rate over the last 12 months"
-        />
-        {first && last ? (
-          <div className="mt-1 flex justify-between text-[11px] text-faint">
-            <span>{formatMonth(first.period, true)}</span>
-            <span>{formatMonth(last.period, true)}</span>
-          </div>
-        ) : null}
-      </div>
+      {cpi.history.length > 1 ? (
+        <div className="mt-auto pt-6">
+          <Sparkline
+            values={cpi.history.map((h) => h.yoy)}
+            height={120}
+            color="var(--c4)"
+            label="Annual CPI rate over the last 12 months"
+          />
+          {first && last ? (
+            <div className="mt-1 flex justify-between text-[11px] text-faint">
+              <span>{formatMonth(first.period, true)}</span>
+              <span>{formatMonth(last.period, true)}</span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </Card>
   );
 }

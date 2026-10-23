@@ -124,3 +124,31 @@ describe('RuleBasedDemoLLM answers from tool results', () => {
     expect(res.message.content).toContain('get_dividends');
   });
 });
+
+describe('RuleBasedDemoLLM tool summaries', () => {
+  it('uses a tool-provided summary sentence instead of dumping fields', async () => {
+    const llm = new RuleBasedDemoLLM();
+    const res = await llm.chat({
+      messages: [
+        { role: 'user', content: 'Compare VOO and QQQ' },
+        {
+          role: 'assistant',
+          content: null,
+          toolCalls: [{ id: 'c1', name: 'compare_funds', arguments: '{}' }],
+        },
+        {
+          role: 'tool',
+          tool_call_id: 'c1',
+          content: JSON.stringify({
+            summary: 'VOO and QQQ overlap 41% by weight.',
+            overlapByWeight: 0.41,
+            asOf: '2026-06-30',
+          }),
+        },
+      ],
+    });
+    expect(res.message.content).toMatch(/^VOO and QQQ overlap 41% by weight\./);
+    expect(res.message.content).toContain('Data as of 2026-06-30');
+    expect(res.message.content).not.toContain('overlapByWeight');
+  });
+});

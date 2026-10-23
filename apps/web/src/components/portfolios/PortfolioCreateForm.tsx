@@ -1,17 +1,15 @@
 'use client';
 
 import { Eye, FlaskConical, Wallet } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { PortfolioType } from '@/components/types';
 import { Button } from '@/components/ui/Button';
 import { Field, TextInput } from '@/components/ui/Field';
+import { api, ApiError, unwrap } from '@/lib/api/client';
 import { cn } from '@/lib/cn';
 
-export type CreatePortfolioInput = { name: string; type: PortfolioType };
-
 export type PortfolioCreateFormProps = {
-  /** Persist the portfolio. Not wired yet. */
-  action?: (data: CreatePortfolioInput) => void | Promise<void>;
   /** Focus the name field on mount (e.g. arriving from "+ New portfolio"). */
   autoFocus?: boolean;
   className?: string;
@@ -39,10 +37,12 @@ const TYPES: { value: PortfolioType; label: string; body: string; icon: typeof W
 ];
 
 /** Create-portfolio form: name + type radio cards. */
-export function PortfolioCreateForm({ action, autoFocus, className }: PortfolioCreateFormProps) {
+export function PortfolioCreateForm({ autoFocus, className }: PortfolioCreateFormProps) {
+  const router = useRouter();
   const [name, setName] = useState('');
   const [type, setType] = useState<PortfolioType>('actual');
-  const [created, setCreated] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <form
@@ -50,9 +50,16 @@ export function PortfolioCreateForm({ action, autoFocus, className }: PortfolioC
       onSubmit={async (e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        await action?.({ name: name.trim(), type });
-        setCreated(name.trim());
-        setName('');
+        setBusy(true);
+        setError(null);
+        try {
+          const p = unwrap(await api.POST('/portfolios', { body: { name: name.trim(), type } }));
+          router.push(`/portfolios/${p.id}/holdings`);
+          router.refresh();
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : 'Could not create the portfolio.');
+          setBusy(false);
+        }
       }}
     >
       <Field label="Name">
@@ -103,12 +110,12 @@ export function PortfolioCreateForm({ action, autoFocus, className }: PortfolioC
         </div>
       </fieldset>
       <div className="flex items-center gap-3">
-        <Button type="submit" variant="primary">
-          Create portfolio
+        <Button type="submit" variant="primary" disabled={busy}>
+          {busy ? 'Creating…' : 'Create portfolio'}
         </Button>
-        {created ? (
-          <span role="status" className="text-[13px] text-brand">
-            Created {created}
+        {error ? (
+          <span role="alert" className="text-[13px] text-down">
+            {error}
           </span>
         ) : null}
       </div>

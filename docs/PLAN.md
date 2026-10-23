@@ -43,11 +43,15 @@ Stop when every box is ticked or only blocked tasks remain.
   - Note: no DATABASE_URL → embedded PGlite (`.easyfi-data/`) for local demo mode.
 - [x] PGlite test harness (fresh migrated DB per test file)
 - [x] Repositories with user scoping (test: user A cannot read user B's portfolio)
-- [ ] `contracts` zod schemas + OpenAPI generation at `/api/v1/openapi.json`
-- [ ] Auth middleware: Supabase JWT (Bearer) + SSR cookie; invite-code sign-up gate
-- [ ] Error envelope + zod validation helper
-- [ ] Endpoints: `/me`, portfolios CRUD, holdings CRUD, CSV import
-- [ ] Generated typed client package used by web
+- [x] `contracts` zod schemas + OpenAPI generation at `/api/v1/openapi.json`
+  - Note: one endpoint table (`packages/contracts/src/endpoints.ts`) drives OpenAPI, routing and validation.
+- [x] Auth middleware: Supabase JWT (Bearer) + SSR cookie; invite-code sign-up gate
+  - Note: httpOnly `easyfi_at`/`easyfi_rt` cookies set by `/auth/sign-in`; no Supabase env → local demo auth (scrypt creds in `local_credentials`).
+- [x] Error envelope + zod validation helper
+- [x] Endpoints: `/me`, portfolios CRUD, holdings CRUD, CSV import
+  - Note: framework-agnostic `handleApiRequest` in services; Next route is a one-line adapter.
+- [x] Generated typed client package used by web
+  - Note: `apps/web/src/lib/api/schema.d.ts` (openapi-typescript, freshness test); server components call the handler in-process via `serverApi()`.
 
 ## M3 — Data ingestion
 - [x] `data-sources` interfaces + fakes: PriceSource, HoldingsSource, DividendSource, CpiSource, LLMProvider
@@ -55,20 +59,21 @@ Stop when every box is ticked or only blocked tasks remain.
 - [x] SEC EDGAR N-PORT client: ticker→series lookup, parse holdings XML, map CUSIP→ticker
   - Note: UIT funds (SPY, QQQ, DIA) don't file N-PORT → need seeded holdings.
 - [x] BLS CPI client
-- [ ] Securities search + seed of popular ETFs
-- [ ] Nightly job (spec §9) + `job_runs` table + GitHub Actions cron workflow
+- [x] Securities search + seed of popular ETFs
+- [x] Nightly job (spec §9) + `job_runs` table + GitHub Actions cron workflow
+  - Note: Tiingo budget: ≤45 tickers/run stalest-first; also evaluates alerts + emails via Resend.
 
 ## M4 — Web app: shell, home, portfolio
-- [ ] App shell: sidebar, dark/light theme, responsive, auth pages (sign in/up with invite)
-- [ ] Portfolios list + create/edit
-- [ ] Holdings page: table (Overview/Returns/Income/Look-through views), add side panel, CSV import, tags, filters, export CSV
-- [ ] Portfolio page: value chart, allocation donut + diversification score, Stack view (expand per-ETF contribution)
-- [ ] Home: total value, allocation, portfolios sorted by risk, exposure insights, movers
+- [x] App shell: sidebar, dark/light theme, responsive, auth pages (sign in/up with invite)
+- [x] Portfolios list + create/edit
+- [x] Holdings page: table (Overview/Returns/Income/Look-through views), add side panel, CSV import, tags, filters, export CSV
+- [x] Portfolio page: value chart, allocation donut + diversification score, Stack view (expand per-ETF contribution)
+- [x] Home: total value, allocation, portfolios sorted by risk, exposure insights, movers
 - [ ] Playwright e2e: invite sign-up → portfolio → VOO+QQQ → look-through visible
 
 ## M5 — Compare + Constellation
 - [ ] `/compare` API + page (sector donuts, shared holdings, overlap %)
-- [ ] Constellation API + d3-force view with side panel
+- [x] Constellation API + d3-force view with side panel
 
 ## M6 — Dividends
 - [ ] `/dividends` API + page (KPI cards, income calendar, projection, yield leaders, holdings table)
@@ -77,23 +82,23 @@ Stop when every box is ticked or only blocked tasks remain.
 - [ ] `/inflation` API + page (CPI snapshot, category drivers, purchasing-power calculator)
 
 ## M8 — AI Investment Explorer
-- [ ] OpenRouter `LLMProvider` + tool-calling loop over services; per-user daily limit
-- [ ] Explorer API (threads, streamed messages, structured blocks)
+- [x] OpenRouter `LLMProvider` + tool-calling loop over services; per-user daily limit
+- [x] Explorer API (threads, streamed messages, structured blocks)
 - [ ] Explorer page + Home ask bar + "Ask why" links from insights
-- [ ] Fake-LLM tests + `docs/explorer-evals.md` with 20 eval questions
+- [x] Fake-LLM tests + `docs/explorer-evals.md` with 20 eval questions
 
 ## M9 — Extras
 - [ ] What-if simulator page (add fund → sector shift, overlap)
-- [ ] Fee drag card on portfolio
+- [x] Fee drag card on portfolio
 - [ ] FI goal tracker (target number, progress, projection)
 - [ ] Alerts (email via Supabase/Resend free): concentration threshold, upcoming dividend
 - [ ] Shareable read-only snapshot link
 - [ ] Help + What's new pages, feedback form (Supabase Storage screenshot)
 
 ## M10 — Deploy
-- [ ] Vercel project + env vars documented in `docs/DEPLOY.md`
-- [ ] Supabase project setup steps + migration command documented
+- [x] Vercel project + env vars documented in `docs/DEPLOY.md`
+- [x] Supabase project setup steps + migration command documented
 - [ ] Smoke test on production URL
 
 ## Blocked
-(none yet)
+- M10 smoke test on production URL — needs the Vercel/Supabase projects and secrets (owner action; steps in `docs/DEPLOY.md` §4).

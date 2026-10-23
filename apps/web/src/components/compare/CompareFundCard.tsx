@@ -4,7 +4,23 @@ import { Card } from '@/components/ui/Card';
 import { MiniBar } from '@/components/ui/MiniBar';
 import { formatPercent } from '@/lib/format';
 import { OTHER_COLOR } from '@/lib/palette';
+import { compareLabel } from './labels';
 import type { CompareFund } from './types';
+
+/** "VOO  Vanguard S&P 500 ETF" for a fund; "Family Taxable  Portfolio" for a portfolio. */
+function FundTitle({ fund }: { fund: CompareFund }) {
+  return fund.kind === 'portfolio' ? (
+    <h2 className="flex min-w-0 items-baseline gap-2.5">
+      <span className="truncate text-[19px] font-bold text-fg">{fund.name}</span>
+      <span className="shrink-0 text-[14px] text-muted">Portfolio</span>
+    </h2>
+  ) : (
+    <h2 className="flex min-w-0 items-baseline gap-2.5">
+      <span className="font-mono text-[19px] font-bold text-fg">{fund.ticker}</span>
+      <span className="truncate text-[14px] text-muted">{fund.name}</span>
+    </h2>
+  );
+}
 
 export type CompareFundCardProps = {
   fund: CompareFund;
@@ -20,20 +36,28 @@ export function CompareFundCard({ fund, colors }: CompareFundCardProps) {
     undefined,
   );
   const scale = Math.max(0.55, ...fund.sectors.map((s) => s.weight));
+  if (fund.sectors.length === 0) {
+    return (
+      <Card className="flex flex-col">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <FundTitle fund={fund} />
+          <AsOf date={fund.asOf} prefix="holdings as of" />
+        </div>
+        <p className="mt-6 text-[13px] text-muted">No sector breakdown available yet.</p>
+      </Card>
+    );
+  }
   return (
     <Card className="flex flex-col">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="flex min-w-0 items-baseline gap-2.5">
-          <span className="font-mono text-[19px] font-bold text-fg">{fund.ticker}</span>
-          <span className="truncate text-[14px] text-muted">{fund.name}</span>
-        </h2>
+        <FundTitle fund={fund} />
         <AsOf date={fund.asOf} prefix="holdings as of" />
       </div>
       <div className="mt-5 flex flex-1 flex-col items-center gap-7 sm:flex-row sm:gap-8">
         <Donut
           size={186}
           thickness={26}
-          label={`${fund.ticker} sector weights`}
+          label={`${compareLabel(fund)} sector weights`}
           slices={fund.sectors.map((s) => ({ ...s, color: colors[s.key] ?? OTHER_COLOR }))}
           center={
             <DonutCenter
@@ -84,12 +108,11 @@ export function CompareTopHoldingsCard({
   return (
     <Card className="flex flex-col">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="flex min-w-0 items-baseline gap-2.5">
-          <span className="font-mono text-[19px] font-bold text-fg">{fund.ticker}</span>
-          <span className="truncate text-[14px] text-muted">{fund.name}</span>
-        </h2>
+        <FundTitle fund={fund} />
         <span className="text-[12px] text-faint">
-          Top {fund.topHoldings.length} of {fund.holdingsCount.toLocaleString('en-US')}
+          {fund.topHoldings.length
+            ? `Top ${fund.topHoldings.length} of ${fund.holdingsCount.toLocaleString('en-US')}`
+            : 'No holdings data'}
         </span>
       </div>
       <ol className="mt-4 divide-y divide-line">
@@ -108,7 +131,9 @@ export function CompareTopHoldingsCard({
                   </span>
                 ) : null}
               </span>
-              <MiniBar fraction={h.weight / max} color={color} className="hidden w-24 sm:block" />
+              <span className="hidden w-24 shrink-0 sm:block">
+                <MiniBar fraction={h.weight / max} color={color} />
+              </span>
               <span className="w-12 text-right font-semibold text-fg">
                 {formatPercent(h.weight)}
               </span>
